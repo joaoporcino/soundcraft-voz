@@ -1,0 +1,9 @@
+{
+  "name": "soundcraft-voz",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node src/index.js", "test": "node --test" },
+  "dependencies": { "soundcraft-ui-connection": "7.0.3" }
+}
