@@ -6,19 +6,28 @@ import { parseCommand, describe } from './commands.js';
 const args = process.argv.slice(2);
 const has = flag => args.includes(flag);
 const value = flag => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
+const python = value('--python') || (process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python');
 if (has('--help')) {
-  console.log('npm start -- [--live --ip IP_DA_MESA] [--texto] [--python CAMINHO] [--modelo small]');
+  console.log('npm start -- [--live --ip IP_DA_MESA] [--texto] [--descrever] [--dispositivo ID] [--canal-audio N] [--listar-dispositivos] [--modelo small]');
   process.exit(0);
 }
-const live = has('--live'), ip = value('--ip');
+if (has('--listar-dispositivos') || has('--list-devices')) {
+  const child = spawn(python, ['src/transcribe.py', '--list-devices'], { stdio: 'inherit' });
+  child.on('close', code => process.exit(code || 0));
+} else {
+const live = has('--live'), ip = value('--ip'), descrever = has('--descrever');
 if (live && (!ip || ip.startsWith('--'))) { console.error('Informe o endereço da mesa com --ip.'); process.exit(1); }
 const rl = createInterface({ input: stdin, output: stdout });
 let mixer, ConnectionStatus;
 async function transcribe() {
-  const python = value('--python') || (process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python');
   const model = value('--modelo') || 'small';
+  const device = value('--dispositivo');
+  const channel = value('--canal-audio') || '1';
+  const pyArgs = ['src/transcribe.py', '--model', model, '--channel', channel];
+  if (device !== undefined) pyArgs.push('--device', device);
+  if (descrever) pyArgs.push('--descrever');
   return new Promise((resolve, reject) => {
-    const child = spawn(python, ['src/transcribe.py', '--model', model], { stdio: ['ignore', 'pipe', 'inherit'] });
+    const child = spawn(python, pyArgs, { stdio: ['ignore', 'pipe', 'inherit'] });
     let out = ''; child.stdout.setEncoding('utf8'); child.stdout.on('data', chunk => out += chunk);
     child.on('error', reject); child.on('close', code => code === 0 ? resolve(out.trim()) : reject(Error(`Transcrição terminou com código ${code}.`)));
   });
@@ -36,7 +45,7 @@ try {
     try {
       await Promise.race([mixer.connect(), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Tempo de conexão esgotado.')), 8000); })]);
     } finally { clearTimeout(timer); }
-    if (mixer.status !== ConnectionStatus.Open) throw Error('A conexão não foi confirmada pela biblioteca.');
+    if (mixer.conn.status !== ConnectionStatus.Open) throw Error('A conexão não foi confirmada pela biblioteca.');
     console.log('Conexão estabelecida.');
   }
   while (true) {
@@ -44,19 +53,23 @@ try {
     if (input.trim().toLowerCase() === 'sair') break;
     try {
       const text = has('--texto') ? input : await transcribe();
-      console.log(`Reconhecido: ${text || '(vazio)'}`);
+      if (descrever) console.log(`[Whisper - Transcrição completa]: "${text || '(vazio)'}"`);
+      else console.log(`Reconhecido: ${text || '(vazio)'}`);
       const command = parseCommand(text);
       console.log(describe(command));
-      if ((await rl.question('Confirmar? Digite sim: ')).trim().toLowerCase() !== 'sim') { console.log('Cancelado.'); continue; }
       if (live) {
-        if (mixer.status !== ConnectionStatus.Open) throw Error('Mesa desconectada; comando não enviado.');
+        if (mixer.conn.status !== ConnectionStatus.Open) throw Error('Mesa desconectada; comando não enviado.');
         const channel = mixer.master.input(command.channel);
         if (command.action === 'mute') channel.mute();
         else if (command.action === 'unmute') channel.unmute();
         else channel.setFaderLevelDB(command.db);
         console.log('Comando enviado; confira o resultado na interface da mesa.');
       } else console.log('Simulação concluída.');
-    } catch (error) { console.error(`Erro: ${error.message}`); }
+    } catch (error) {
+      if (descrever) console.error(`[Aviso]: ${error.message}`);
+      else console.error(`Erro: ${error.message}`);
+    }
   }
 } catch (error) { console.error(`Erro: ${error.message}`); process.exitCode = 1; }
 finally { rl.close(); if (mixer) await mixer.disconnect(); }
+}

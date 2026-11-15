@@ -23,7 +23,7 @@ py -3.12 -m venv .venv
 npm start
 ```
 
-Por padrão o programa simula os comandos e não acessa a mesa. Aperte Enter, fale após aparecer “Gravando agora” e confirme com `sim`. Use `sair` para terminar. Para experimentar sem microfone nem modelo:
+Por padrão o programa simula os comandos e não acessa a mesa. Aperte Enter, fale após aparecer “Gravando agora” e o comando é executado imediatamente. Use `sair` para terminar. Para experimentar sem microfone nem modelo:
 
 ```powershell
 npm start -- --texto
@@ -46,7 +46,7 @@ Conecte o computador à mesma rede da mesa, descubra o IP na configuração de r
 npm start -- --live --ip 192.168.1.100
 ```
 
-É possível acrescentar `--texto` para testar a conexão sem voz ou `--modelo base` para escolher outro modelo do faster-whisper. Comandos só são enviados após a confirmação digitada; o envio não garante que a mesa tenha aplicado a alteração, portanto confira na interface oficial. O processamento de voz acontece somente após apertar Enter, sem escuta contínua. O carregamento do modelo ocorre a cada gravação e pode demorar; a latência depende do computador.
+É possível acrescentar `--texto` para testar a conexão sem voz, `--descrever` para mostrar em tempo real no terminal tudo o que o Whisper está ouvindo (nível de áudio, trechos identificados e taxa de confiança), `--modelo base` para escolher outro modelo do faster-whisper, `--listar-dispositivos` para ver os microfones disponíveis, `--dispositivo <ID>` para escolher um microfone específico e `--canal-audio <1 ou 2>` para selecionar o canal de uma interface estéreo/multicanal. Os comandos válidos são aplicados diretamente na mesa. O processamento de voz acontece somente após apertar Enter, sem escuta contínua. O carregamento do modelo ocorre a cada gravação e pode demorar; a latência depende do computador.
 
 ## Testes
 
