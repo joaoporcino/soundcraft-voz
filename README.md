@@ -4,6 +4,8 @@ Protótipo local de controle da Soundcraft Ui24R por voz em português. O microf
 
 A visão futura, a arquitetura proposta e os diagramas das entidades estão em [docs/arquitetura.md](docs/arquitetura.md). O documento distingue as funcionalidades planejadas das já disponíveis neste protótipo.
 
+O andamento, as próximas etapas e os critérios de validação estão em [docs/plano-de-execucao.md](docs/plano-de-execucao.md).
+
 Esta primeira versão controla **mute e fader dos canais de entrada 1 a 24 no mix principal**. Não altera ganho, phantom power, equalização, auxiliares ou master. Para reduzir mudanças inesperadas, o ajuste absoluto do fader está limitado a -60 até 0 dB. Confira a transcrição e teste inicialmente em um canal sem sinal.
 
 ## Requisitos

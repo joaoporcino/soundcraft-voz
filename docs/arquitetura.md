@@ -14,7 +14,7 @@ O protótipo já validou o caminho de captura de voz, transcrição pelo Whisper
 
 Manter **Node.js como serviço principal** e **Python para captura de áudio e faster-whisper**. A conexão atual com a Ui24R utiliza a biblioteca comunitária `soundcraft-ui-connection` em Node.js e permanece como ponto de partida. Go e Rust poderão ser reavaliados se houver uma necessidade demonstrada; não há migração planejada neste momento. A troca da linguagem do serviço, por si só, não elimina a espera pela gravação ou pela inferência do Whisper.
 
-O Node.js será responsável pelo painel e sua API, persistência, conexão com a mesa, regras e modos de operação. O Python será responsável pela captura e transcrição. A proposta inicial é manter o processo Python e o modelo carregados durante a operação, com mensagens estruturadas por entrada e saída padrão entre os processos; o protocolo deve permitir identificar pedidos, resultados e erros. Eventos em tempo real para o painel podem usar WebSocket local. Essas escolhas de comunicação ainda precisam de validação na implementação.
+O Node.js será responsável pela interface de terminal inicial, persistência, conexão com a mesa, regras e modos de operação. O Python será responsável pela captura e transcrição. A proposta inicial é manter o processo Python e o modelo carregados durante a operação, com mensagens estruturadas por entrada e saída padrão entre os processos; o protocolo deve permitir identificar pedidos, resultados e erros. Uma interface web, sua API e eventos em tempo real são evoluções futuras. Essas escolhas de comunicação ainda precisam de validação na implementação.
 
 Para iniciar com o Windows sem intervenção manual, deve-se verificar se o computador entra automaticamente em uma sessão de usuário ou se o aplicativo precisa funcionar antes de qualquer login. Uma tarefa no login pode atender ao primeiro caso; uma tarefa na inicialização ou um serviço do Windows pode atender ao segundo. Em qualquer opção, testar acesso ao driver e aos dispositivos de áudio no contexto real de execução, assim como inicialização sem janela de terminal e recuperação após falhas. O painel é uma interface separada do processo em segundo plano. **A forma definitiva de instalação ainda não foi escolhida.**
 
@@ -25,7 +25,7 @@ flowchart LR
     whisper --> interpretacao["Interpretação: comandos e LLM"]
     dados["Cadastros e sessão"] --> interpretacao
     interpretacao --> validacao["Validação e regras de operação"]
-    painel["Painel no navegador"] <--> servico["Serviço local"]
+    painel["Terminal inicial / painel web futuro"] <--> servico["Serviço local"]
     servico <--> validacao
     validacao --> adaptador["Adaptador da mesa"]
     adaptador <--> mesa["Soundcraft Ui24R"]
@@ -39,6 +39,18 @@ flowchart LR
 - **Conexão:** informa se está conectada, tentando reconectar ou precisa de configuração. Continua tentando quando a mesa estiver desligada. Comandos feitos durante a desconexão não devem ser executados automaticamente depois.
 - **Voz:** captura por entrada, transcrição e resposta falada. Uma primeira versão pode usar mensagens prontas e as vozes do Windows; uma LLM não é necessária para sintetizar fala.
 - **Interpretação:** comandos existentes podem coexistir com uma LLM para frases mais naturais. Um servidor MCP é uma possibilidade para expor ferramentas específicas; uma camada de validação deve conferir referências, limites e necessidade de confirmação antes de qualquer ação.
+
+### Interface de configuração e revisão
+
+**Decisão de prioridade:** usar o terminal (CMD/PowerShell) inicialmente; interface gráfica no navegador e acesso por celular ou tablet ficam para uma etapa posterior. Separar regras, persistência e operação da mesa da interface para permitir essa evolução. Na fase inicial, configurar e consultar o IP e demais opções disponíveis pelo terminal e revisar, corrigir, confirmar ou rejeitar propostas por texto no terminal quando a funcionalidade de cadastro por voz existir. O serviço em segundo plano e o terminal de configuração precisam de um canal de administração, a definir e validar, para funcionar mesmo quando o serviço não tiver janela interativa.
+
+O futuro painel web deve permitir que usuários autorizados configurem o endereço IP da mesa e consultem o estado da conexão, além de configurar entradas de áudio, microfone master, modos, integrantes, fontes, retornos e outras opções. O IP e as demais preferências devem ser validados, persistidos e recuperados após reinício; alteração de IP deve atualizar o estado de conexão e iniciar tentativas para o novo endereço.
+
+O acesso começa local no computador. Acesso por outros dispositivos na rede é uma possibilidade a implementar somente com autenticação, autorização por perfil, proteção da conexão e configuração explícita; não pressupor que qualquer dispositivo da rede seja confiável. O modelo de usuários e permissões e os detalhes de transporte devem ser definidos e testados antes de liberar acesso remoto.
+
+Cadastros e alterações solicitados por voz devem aparecer no painel com a frase reconhecida, campos interpretados, origem e estado de revisão. O sistema deve permitir corrigir os valores, confirmar ou rejeitar a proposta e mostrar o resultado efetivo. Até a confirmação exigida, não considerar vínculos propostos como confirmados nem executar ações dependentes. Revisão e confirmação por voz podem ser adicionadas com as mesmas regras de autorização; o painel continua disponível para correção. Caso a transcrição ou um vínculo seja ambíguo, pedir esclarecimento ou deixá-lo pendente, sem presumir o valor.
+
+Como melhoria posterior ao painel, um celular ou tablet poderá capturar áudio no navegador e enviá-lo ao computador para transcrição pelo Whisper. Validar autenticação, permissões do navegador, contexto seguro/HTTPS, origem da conversa, concorrência e queda de rede antes de implementar. A captura pelo tablet não é requisito da primeira versão.
 
 ### Conexão com a LLM e custos
 
@@ -333,6 +345,31 @@ erDiagram
 
 Identificação por declaração, origem do áudio e reconhecimento biométrico são coisas diferentes. A primeira versão pode pedir o nome e confirmar os vínculos, sem depender de biometria. Um vínculo ainda não confirmado não deve ser tratado como certeza.
 
+### Fontes, equipamentos e caminhos físicos
+
+Separar a **fonte sonora** (voz, coral, guitarra, contrabaixo, teclado etc.), os **equipamentos** usados para captá-la ou transportá-la e as **conexões** até a mesa. Uma pessoa pode ter várias fontes, uma fonte pode envolver vários equipamentos ou canais e um microfone de coral pode captar várias pessoas.
+
+No cadastro inicial, exigir somente o necessário para identificar a fonte ou equipamento e registrar o caminho conhecido; marca, modelo e características técnicas são opcionais, com valor desconhecido quando não informado. Características independentes não devem ser misturadas: um microfone pode ser **sem fio** e também **dinâmico ou condensador**. Para instrumentos, registrar o tipo e o caminho efetivo: por exemplo, guitarra por pedaleira ou por amplificador microfonado; contrabaixo por DI. Receptor sem fio, DI, amplificador, medusa e regulador de retorno podem ser equipamentos distintos.
+
+```mermaid
+flowchart LR
+    fonte["Fonte: voz ou instrumento"] --> captacao["Microfone, DI ou outra captação"]
+    captacao --> caminho["Conexão direta ou via medusa"]
+    caminho --> entrada["Entrada física da mesa"]
+    entrada --> patch["Patch observado ou confirmado"]
+    patch --> canal["Canal de processamento"]
+```
+
+Um microfone sem fio pode seguir por **microfone → receptor → saída do receptor → entrada da mesa → patch → canal**, sem passar pela medusa. Uma fonte no palco pode passar por **entrada da medusa → via → extremidade junto à mesa → entrada física → patch → canal**. Cada extremo e direção de uma via devem ser registrados conforme a instalação; não presumir correspondência automática entre números ou entre entrada física e canal. O mapeamento pode começar resumido, sem exigir cadastro individual de todos os cabos, e deve indicar se foi observado, confirmado ou ainda é desconhecido.
+
+Para retornos individuais, registrar **mistura auxiliar → saída física da mesa → via e saída da medusa → regulador individual → fone → integrante**. Um retorno estéreo pode usar um par de auxiliares e vias. O serviço não conhece nem controla a posição de um regulador físico sem integração específica.
+
+Nome e cor do canal na mesa, nome da fonte e etiquetas físicas de equipamentos, cabos ou vias são identificações relacionadas, mas independentes. Cor não é identificador único. Leitura e alteração de nome e cor na mesa dependem da capacidade comprovada da integração; até lá, podem ser registradas apenas no aplicativo com essa distinção explícita.
+
+Ao ouvir “o microfone amarelo sem fio está com a Ana”, a interpretação propõe um vínculo de sessão. O serviço procura equipamentos compatíveis e resolve o canal pelo caminho cadastrado e pelo patch observado ou confirmado. Quando houver duplicidade de cor, caminho incompleto, patch desconhecido ou conflito com outro vínculo, solicita esclarecimento e mantém a proposta pendente. Não inventar o canal; confirmar a associação antes de tratá-la como definitiva.
+
+Tipo, marca, modelo e caminho ajudam na passagem de som e em diagnósticos, mas não determinam uma equalização adequada. Sugestões devem considerar sinal e contexto e ser revisáveis pelo técnico. Quando conhecido, registrar requisitos e compatibilidade de phantom power e sua origem documental; verificar o equipamento efetivamente conectado à entrada, inclusive saída de receptor e DI. **Não ativar phantom power automaticamente com base apenas no tipo de microfone**: a compatibilidade da cadeia precisa ser verificada e qualquer alteração deve seguir a política de confirmação do técnico.
+
 ### Exemplo de uma sessão
 
 Ana canta no microfone sem fio 3, conectado à entrada física 5 e roteado para o canal 5. Ela também toca violão por uma DI na entrada e no canal 8. Ana e João compartilham o AUX 2. Se Ana pedir para baixar seu violão no retorno, o sistema identifica a fonte, o canal e o auxiliar e ajusta o **envio do canal 8 para o AUX 2**; isso afeta a mistura compartilhada, não apenas Ana.
@@ -418,6 +455,50 @@ A evolução proposta é: monitorar e alertar; apresentar sugestões; aplicar mu
 
 Outras possibilidades a avaliar são uma verificação de pendências antes do culto, perfis de formação revisáveis, histórico e reversão condicionada ao estado atual, diagnóstico guiado e modos de preparação, operação ao vivo, consulta e simulação. O armazenamento de transcrições ou áudio e seu prazo devem ser escolhas explícitas da equipe.
 
+## Qualidade, testes e avaliação de IA
+
+O projeto deve validar tanto o software desenvolvido quanto o comportamento de transcrição e interpretação. A estratégia é incremental e acompanha a implementação: não se presume que as ferramentas ou o pipeline abaixo já estejam configurados.
+
+### Especificações, skills e hooks
+
+Para funcionalidades relevantes, usar uma especificação curta em `docs/especificacoes/` antes da implementação, conectada ao plano. Ela descreve problema, escopo, comportamento, integrações, critérios de aceite, testes e questões abertas. Alterações pequenas podem ser tratadas diretamente no plano. O [modelo de especificação](especificacoes/modelo.md) é um guia, não uma exigência de preencher detalhes sem necessidade.
+
+O `AGENTS.md` reúne regras gerais de desenvolvimento. Skills de desenvolvimento devem ser criadas apenas quando um procedimento recorrente justificar instruções reutilizáveis próprias; não duplicar regras e arquitetura. Skills do futuro assistente de som são outra categoria e serão avaliadas quando seus fluxos forem implementados.
+
+Verificações compartilhadas devem rodar no CI. Hooks Git locais podem ser adicionados depois que os comandos estiverem estáveis, para verificações rápidas; devem ser versionados com instruções de instalação e não substituem o CI. Não executar testes com mesa física ou chamadas pagas automaticamente em hooks. Nenhuma dessas automações é considerada implementada até ser configurada e validada.
+
+### Ferramentas previstas
+
+| Camada | Ferramenta | Uso |
+| --- | --- | --- |
+| Node.js | `node:test` | Testes unitários, integração e fluxos; o projeto já usa esse executor. |
+| Node.js | ESLint | Verificações estáticas e padrões de código. |
+| Python | pytest | Testes do processo de voz, segmentação e integração com o serviço. |
+| Python | Ruff | Lint e verificação de formatação. |
+| Automação | GitHub Actions | Executar verificações apropriadas em commits e pull requests. |
+| Interface web futura | Playwright | Testes de fluxos no navegador quando a interface existir; não é requisito da versão de terminal. |
+
+Configurar ferramentas gradualmente e documentar comandos reproduzíveis. Reavaliar alternativas como Vitest se surgirem necessidades não atendidas; não migrar apenas por preferência. Cobertura é um indicador, não prova de qualidade; não substituir testes relevantes por uma meta percentual arbitrária.
+
+### Camadas de teste
+
+- **Unitários:** verificar comportamento de interpretação, resolução de vínculos, escala absoluta/relativa, permissões, limites, modo de operação e tratamento de ambiguidades. Exemplo: duas etiquetas amarelas devem gerar esclarecimento, não escolha arbitrária.
+- **Integração:** conectar componentes reais entre si com dependências externas simuladas: Node/Python, serviço/armazenamento e serviço/adaptador de mesa. Cobrir comunicação, persistência, queda e reinício de processos, reconexão, estado desatualizado e ausência de reenvio tardio de pedidos offline.
+- **Fluxos ponta a ponta simulados:** testar o caminho pelo terminal desde pedido até proposta, confirmação, persistência ou comando ao simulador; incluir negação de ações não autorizadas e falhas. Uma mesa simulada não comprova comportamento da Ui24R real e deve ser ajustada aos comportamentos observados.
+- **Equipamento real:** testes explícitos com computador, driver, USB e mesa, fora de apresentação, para validar mapeamento, áudio, estado e operações; registrar firmware, ambiente, resultado e participação do usuário. Testes do Holyrics e do Windows real também ficam separados do pipeline padrão.
+
+### Avaliação do Whisper e da LLM
+
+Manter casos repetíveis e versões/configurações registradas para comparar mudanças. Para o Whisper, avaliar frases de pessoas diferentes, nomes, números, sotaques, pausas, música, silêncio e situações sem comando. Medir erros que mudam a ação ou o alvo, comandos perdidos, ativações falsas, latência e recursos; definir metas depois da linha de base. Gravar, armazenar e compartilhar áudios somente com autorização adequada e fora do repositório público quando contiverem dados pessoais.
+
+Para a LLM, criar casos com pedido, contexto, ação ou esclarecimento esperado e ações proibidas. Incluir equipamentos duplicados, canal/retorno desconhecido, mesa desconectada, comandos sem permissão, mudanças concorrentes e instruções contraditórias. Verificar deterministicamente ferramenta solicitada, alvo, parâmetros, permissões, confirmação e resultado; uma LLM avaliadora pode complementar a revisão de linguagem, mas não é a única garantia de correção. Registrar modelo, prompt, dataset, configurações, custo e resultados quando aplicável; respostas podem variar, então decisões sensíveis continuam protegidas por regras do serviço.
+
+### Pipeline e evidência
+
+O pipeline padrão deve executar lint e testes automatizados apropriados, incluindo integrações e fluxos simulados, sem depender de mesa física, microfone, Holyrics instalado, credenciais ou chamadas pagas. Avaliações que usem modelos externos e testes com hardware são separados e executados explicitamente, com condições e custos conhecidos. Proteger dados de teste e segredos, inclusive em logs e artefatos de CI.
+
+Cada entrega registra no plano quais verificações passaram, o que não foi executado e por quê. Uma mudança proposta pela IA de desenvolvimento continua sujeita a esses critérios e à revisão do comportamento; testes aprovados não substituem validação física quando ela for necessária.
+
 ## Estado, ações e histórico
 
 O aplicativo deve distinguir o último estado observado na mesa, o valor solicitado e o resultado da operação. Uma ação pode ser enviada sem que sua aplicação tenha sido confirmada. Como a interface original e outros dispositivos também podem modificar a mesa, o estado observado deve ter horário e ser atualizado quando possível.
@@ -430,7 +511,7 @@ O cadastro fornece contexto, mas não determina uma equalização adequada por s
 
 ## Etapas sugeridas
 
-1. **Base local:** serviço, painel, IP persistido, indicador de estado e reconexão.
+1. **Base local:** serviço, terminal de configuração, IP persistido, indicador de estado e reconexão; painel web em etapa posterior.
 2. **Voz e entradas:** modelo carregado uma vez, seleção de entradas, ativação da escuta e testes com múltiplas fontes.
 3. **Cadastro e sessão:** integrantes, equipamentos, fontes, canais e retornos, com confirmação dos vínculos.
 4. **Linguagem natural:** LLM opcional, ferramentas de consulta e operação e validação das ações.
