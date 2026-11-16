@@ -487,6 +487,10 @@ Configurar ferramentas gradualmente e documentar comandos reproduzíveis. Reaval
 - **Fluxos ponta a ponta simulados:** testar o caminho pelo terminal desde pedido até proposta, confirmação, persistência ou comando ao simulador; incluir negação de ações não autorizadas e falhas. Uma mesa simulada não comprova comportamento da Ui24R real e deve ser ajustada aos comportamentos observados.
 - **Equipamento real:** testes explícitos com computador, driver, USB e mesa, fora de apresentação, para validar mapeamento, áudio, estado e operações; registrar firmware, ambiente, resultado e participação do usuário. Testes do Holyrics e do Windows real também ficam separados do pipeline padrão.
 
+#### Dois níveis de simulação da mesa
+
+Uma mesa em memória permite testar regras sem rede ou hardware; um servidor WebSocket simulado local exercita também a biblioteca `soundcraft-ui-connection` e as mensagens efetivamente implementadas no simulador. Ambos devem operar isolados da rede externa, manter escopo explícito e permitir condições de falha controladas. A simulação testa apenas os comportamentos modelados e não estabelece conformidade com firmware físico nem reproduz áudio. Os detalhes e critérios estão na [especificação](especificacoes/mesa-simulada.md).
+
 ### Avaliação do Whisper e da LLM
 
 Manter casos repetíveis e versões/configurações registradas para comparar mudanças. Para o Whisper, avaliar frases de pessoas diferentes, nomes, números, sotaques, pausas, música, silêncio e situações sem comando. Medir erros que mudam a ação ou o alvo, comandos perdidos, ativações falsas, latência e recursos; definir metas depois da linha de base. Gravar, armazenar e compartilhar áudios somente com autorização adequada e fora do repositório público quando contiverem dados pessoais.

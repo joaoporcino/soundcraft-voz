@@ -58,4 +58,35 @@ npm start -- --live --ip 192.168.1.100
 npm test
 ```
 
-O teste automatizado cobre a interpretação dos comandos; o uso com microfone e mesa física precisa ser validado no ambiente real. Referências: [operações de canal](https://fmalcher.github.io/soundcraft-ui/buses/channel) e [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+Para as verificações de desenvolvimento, instale as dependências Node com `npm install` e, no ambiente virtual Python, instale as ferramentas separadamente das dependências de áudio:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+npm run lint
+npm test
+.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m ruff format --check src tests
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Os testes automatizados cobrem o interpretador e um fluxo de transcrição com áudio e modelo simulados, sem baixar o Whisper ou conectar equipamentos. Para usar áudio real, também instale `requirements.txt`; o uso com microfone e mesa física precisa ser validado no ambiente real. O GitHub Actions está configurado para executar lint e testes em alterações. Referências: [operações de canal](https://fmalcher.github.io/soundcraft-ui/buses/channel) e [faster-whisper](https://github.com/SYSTRAN/faster-whisper).
+
+Os testes Node também usam uma mesa em memória de 24 canais e um servidor WebSocket local de teste. Este último exercita a biblioteca real com mute e fader em um canal configurado, além de comandos inválidos e desconexão. A conexão é restrita ao loopback e pode precisar de permissão no ambiente de execução. O simulador não produz áudio e não comprova compatibilidade com todas as funções ou versões da mesa física; o modo `--texto` continua usando o fluxo simulado original do aplicativo.
+
+## Mesa simulada no terminal
+
+Após `npm install`, inicie no CMD ou PowerShell:
+
+```powershell
+npm run simulador
+```
+
+Use `lista` para ver os 24 canais, `canal 3` para consultar, `mute 3`, `desmute 3` ou `fader 3 -6` para alterar o estado. `ajuda` mostra os comandos e `sair` encerra. Os valores são simulados, limitados a -60 até 0 dB, e não há áudio nem conexão com a mesa física.
+
+Para conectar o aplicativo ao simulador, mantenha esse terminal aberto e copie o comando mostrado por ele para outro terminal. Por exemplo, se o endereço exibido for `127.0.0.1:56935`:
+
+```powershell
+npm start -- --texto --live --ip 127.0.0.1:56935
+```
+
+A porta muda a cada execução. Embora o aplicativo mostre “MODO REAL” ao usar `--live`, nesse exemplo ele se conecta apenas ao simulador local; confira o endereço antes de executar. Encerre primeiro o aplicativo com `sair` e depois o simulador. O código HTML da [demonstração oficial da Soundcraft](https://www.soundcraft.com/ui24-software-demo/mixer.html) não está incluído nem conectado ao simulador.

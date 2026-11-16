@@ -29,11 +29,13 @@ Para acompanhar o que depende de você, consulte [suas pendências](suas-pendenc
 
 **Objetivo:** permitir que mudanças futuras sejam verificadas de forma repetível antes de ampliar a arquitetura.
 
-- [ ] Manter os testes Node existentes com `node:test` e configurar ESLint para o código do projeto.
-- [ ] Configurar pytest e Ruff para o Python, com comandos documentados e dependências de desenvolvimento separadas quando apropriado.
+- [x] Manter os testes Node existentes com `node:test` e configurar ESLint para o código do projeto. Verificações locais passaram em 16/11/2026.
+- [x] Configurar pytest e Ruff para o Python, com comandos documentados e dependências de desenvolvimento separadas. Verificações locais passaram em 16/11/2026 com Python 3.14 e dependências de áudio simuladas; Python 3.12 será exercitado no CI quando executado.
 - [ ] Criar verificações de integração e fluxo simuladas conforme os componentes forem implementados; sem exigir mesa, microfone, Holyrics ou credenciais.
+- [x] Implementar dois simuladores complementares conforme [especificação de mesa simulada](especificacoes/mesa-simulada.md): estado em memória para testes de regras e servidor WebSocket local para exercitar a biblioteca real. Conexão, mute, fader, mensagem inválida e queda foram testados localmente; reconexão e fidelidade com equipamento real permanecem pendentes.
+- [x] Criar terminal interativo para visualizar e manipular 24 canais virtuais, com servidor WebSocket em loopback e estado compartilhado com o aplicativo. Comandos, erros, saída e alteração entre terminal e biblioteca real foram testados sem mesa física. A demonstração web da Soundcraft é referência externa; integração com ela não está comprovada nem é requisito.
 - [ ] Configurar GitHub Actions para executar lint e testes disponíveis em alterações; manter testes com hardware e chamadas pagas explícitos e separados.
-- [ ] Preparar formato de casos para avaliação de voz e LLM, incluindo resultados esperados e ações proibidas, preservando privacidade dos áudios.
+- [x] Preparar formato de casos para avaliação de voz e LLM, incluindo resultados esperados e ações proibidas, preservando privacidade dos áudios: [cenários iniciais](avaliacoes.md). A execução das avaliações ainda depende da implementação e de amostras apropriadas.
 - [ ] Depois de estabilizar os comandos locais e o CI, avaliar hook Git local opcional para verificações rápidas, com instruções de instalação e sem hardware ou chamadas pagas.
 
 **Concluída quando:** comandos locais e pipeline executarem as verificações configuradas com resultados reproduzíveis, documentação atualizada e limitações conhecidas. A validação com a mesa continua em etapa própria.
@@ -259,3 +261,6 @@ Ao concluir uma medição ou teste, registrar no histórico abaixo a data, o amb
 | Data | Situação | Evidência ou próximo passo |
 | --- | --- | --- |
 | 16/11/2026 | Planejamento iniciado; protótipo de voz e comando na mesa validado pelo usuário. | Iniciar fase 0; levantar medições e capacidades no equipamento real. |
+| 16/11/2026 | Base de qualidade em andamento. | ESLint e testes Node passaram; pytest e Ruff passaram com áudio/modelo simulados. Workflow de CI criado, ainda não executado no GitHub. Whisper real e mesa física não foram testados nesta alteração. |
+| 16/11/2026 | Simuladores em memória e WebSocket implementados e testados localmente. | Biblioteca 7.0.3, um canal WebSocket com mute e fader, comando inválido e queda simulada; loopback exigiu execução fora do sandbox. Reconexão, CI e fidelidade com a mesa física pendentes. |
+| 16/11/2026 | Terminal interativo do simulador e servidor para 24 canais implementados. | Testes Node, ESLint, pytest e Ruff passaram; aplicativo em modo texto enviou mute ao canal 3 simulado, observado no terminal. Fechar os dois processos simultaneamente gerou aviso da biblioteca na saída; encerrar primeiro o aplicativo. Nenhum teste com mesa física. |
