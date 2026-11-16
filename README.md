@@ -1,8 +1,10 @@
 # Soundcraft por voz
 
-Protótipo local de controle da Soundcraft Ui24R por voz em português. O microfone grava um comando de cinco segundos, o faster-whisper transcreve e o programa apresenta a ação para confirmação. A biblioteca comunitária [soundcraft-ui-connection](https://github.com/fmalcher/soundcraft-ui) controla a mesa; não é uma biblioteca oficial da Soundcraft.
+Protótipo local de controle da Soundcraft Ui24R por voz em português. O microfone grava um comando de cinco segundos, o faster-whisper transcreve e o programa interpreta a ação. No modo real, comandos reconhecidos são enviados imediatamente. A biblioteca comunitária [soundcraft-ui-connection](https://github.com/fmalcher/soundcraft-ui) controla a mesa; não é uma biblioteca oficial da Soundcraft.
 
-Esta primeira versão controla **mute e fader dos canais de entrada 1 a 24 no mix principal**. Não altera ganho, phantom power, equalização, auxiliares ou master. Para reduzir mudanças inesperadas, o ajuste absoluto do fader está limitado a -60 até 0 dB. Confirme sempre a transcrição e teste inicialmente em um canal sem sinal.
+A visão futura, a arquitetura proposta e os diagramas das entidades estão em [docs/arquitetura.md](docs/arquitetura.md). O documento distingue as funcionalidades planejadas das já disponíveis neste protótipo.
+
+Esta primeira versão controla **mute e fader dos canais de entrada 1 a 24 no mix principal**. Não altera ganho, phantom power, equalização, auxiliares ou master. Para reduzir mudanças inesperadas, o ajuste absoluto do fader está limitado a -60 até 0 dB. Confira a transcrição e teste inicialmente em um canal sem sinal.
 
 ## Requisitos
 
