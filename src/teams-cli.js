@@ -1,0 +1,35 @@
+function id(value) {
+  if (!/^[1-9]\d*$/u.test(value ?? '') || !Number.isSafeInteger(Number(value))) throw new Error('ID inválido');
+  return Number(value);
+}
+
+export function parseTeamsCommand([category, action, ...values]) {
+  if ((category === 'grupo' || category === 'papel') && action === 'listar' && values.length === 0) {
+    return registry => category === 'grupo' ? registry.listTeams() : registry.listRoles();
+  }
+  if ((category === 'grupo' || category === 'papel') && action === 'adicionar' && values.length === 1 && values[0].trim()) {
+    return registry => category === 'grupo' ? registry.addTeam(values[0]) : registry.addRole(values[0]);
+  }
+  if (category === 'formacao' && action === 'mostrar' && values.length === 1) {
+    const sessionId = id(values[0]);
+    return registry => registry.listSessionFormation(sessionId);
+  }
+  if (category === 'grupo-integrante' && action === 'listar' && values.length === 1) {
+    const teamId = id(values[0]);
+    return registry => registry.listTeamMembers(teamId);
+  }
+  const fields = {
+    'grupo-integrante': ['teamId', 'personId'], 'grupo-funcao': ['teamId', 'personId', 'roleId'],
+    'sessao-grupo': ['sessionId', 'teamId'], 'sessao-integrante': ['sessionId', 'teamId', 'personId'],
+    'sessao-papel': ['sessionId', 'teamId', 'personId', 'roleId'],
+  }[category];
+  const methods = {
+    'grupo-integrante': ['addTeamMember', 'removeTeamMember'], 'grupo-funcao': ['addTeamMemberRole', 'removeTeamMemberRole'],
+    'sessao-grupo': ['addSessionTeam', 'removeSessionTeam'], 'sessao-integrante': ['addSessionMember', 'removeSessionMember'],
+    'sessao-papel': ['addSessionRole', 'removeSessionRole'],
+  };
+  if (!fields || !['adicionar', 'remover'].includes(action) || values.length !== fields.length) throw new Error('Comando de equipe inválido; consulte ajuda.');
+  const record = Object.fromEntries(fields.map((field, index) => [field, id(values[index])]));
+  const method = methods[category][action === 'adicionar' ? 0 : 1];
+  return registry => registry[method](record);
+}

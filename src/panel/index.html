@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Soundcraft · Painel local</title>
+  <link rel="stylesheet" href="/painel/style.css">
+  <script defer src="/painel/app.js"></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">S</span><span>soundcraft <small>assistente local</small></span></div><span class="local-tag"><i></i> ACESSO LOCAL</span></header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">CENTRAL DE OPERAÇÃO</p><h1>Passagem de som<span>.</span></h1><p>Organize a sessão e revise os vínculos antes de começar.</p></div><div class="intro-mark" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></section>
+    <div id="feedback" class="feedback" role="status" aria-live="polite"></div>
+    <section class="overview" aria-label="Estado do serviço"><div class="status-card"><span class="caption">CONEXÃO DA MESA</span><strong id="connection">Consultando…</strong><span id="connection-detail">Aguardando serviço</span></div><div class="status-card"><span class="caption">MODO ATUAL</span><strong id="mode">—</strong><span>Alterações de modo pelo terminal</span></div><div class="status-card accent"><span class="caption">ITENS EM REVISÃO</span><strong id="pending-count">—</strong><span>Confirmar não comprova o patch físico</span></div></section>
+    <section class="workspace"><aside class="sidebar"><div class="section-heading"><div><p class="eyebrow">CONTEXTO</p><h2> Sessão</h2></div></div><label for="session">Escolha uma sessão</label><select id="session"><option value="">Selecione…</option></select><p class="hint">A sessão selecionada serve apenas para consulta e revisão neste painel.</p><button id="refresh" class="secondary" type="button">↻ &nbsp; Atualizar dados</button><div class="divider"></div><p class="caption">ACOMPANHAMENTO</p><p class="side-copy">Confira os caminhos físicos com o técnico antes de confiar nos vínculos cadastrados.</p></aside>
+    <div class="content"><div class="section-heading"><div><p class="eyebrow">REVISÃO DA SESSÃO</p><h2>Propostas pendentes</h2><p>Confira os detalhes antes de confirmar ou rejeitar.</p></div><span id="session-name" class="session-pill">Nenhuma sessão</span></div><div id="proposals" class="proposal-list"><div class="empty"><span>✳</span><strong>Selecione uma sessão</strong><p>As propostas aguardando revisão aparecerão aqui.</p></div></div><div class="section-heading catalog-heading"><div><p class="eyebrow">CADASTROS</p><h2>Pessoas e equipamentos</h2><p>Dados compartilhados entre as sessões.</p></div></div><div class="catalog"><div><h3>Pessoas <span id="people-count">0</span></h3><ul id="people"></ul></div><div><h3>Equipamentos <span id="equipment-count">0</span></h3><ul id="equipment"></ul></div></div></div></section>
+  </main><footer>Painel local · A confirmação registra uma revisão; o estado físico deve ser conferido na mesa.</footer>
+</body></html>

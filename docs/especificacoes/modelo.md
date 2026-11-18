@@ -2,6 +2,12 @@
 
 Use este modelo de forma proporcional à mudança. Substitua ou remova seções que não forem relevantes; registre incertezas em vez de inventar resultados. Vincule a especificação ao plano de execução.
 
+## Situação atual
+
+- Estado: descreva o que já existe e o que está pendente.
+- Integração: indique onde o componente é usado e seus limites.
+- Validação: descreva evidências e distinga simulação de uso real.
+
 ## Estado e vínculo
 
 - Estado: proposta / em desenvolvimento / implementada / validada / substituída.
