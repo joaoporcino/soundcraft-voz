@@ -67,7 +67,7 @@ if ($found) {
   if (-not $found.Owned) { throw 'Já existe uma tarefa com esse nome que não pertence ao Soundcraft; nada foi alterado.' }
   'already-installed'; exit 0
 }
-$action = New-ScheduledTaskAction -Execute $expectedExecute -Argument $expectedArguments -WorkingDirectory ${ps(path.dirname(id.cli))}
+$action = New-ScheduledTaskAction -Execute $expectedExecute -Argument $expectedArguments -WorkingDirectory ${ps(path.win32.dirname(id.cli))}
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User ([Security.Principal.WindowsIdentity]::GetCurrent().Name)
 $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -Hidden -StartWhenAvailable
@@ -93,7 +93,7 @@ export async function runWindowsStartup(command, {
   if (!['install', 'status', 'uninstall'].includes(command)) {
     throw new Error('Uso: node scripts/windows/startup.js <install|status|uninstall>');
   }
-  const identity = taskIdentity({ node, cli: path.resolve(root, 'src', 'local-service-cli.js') });
+  const identity = taskIdentity({ node, cli: path.win32.resolve(root, 'src', 'local-service-cli.js') });
   const output = await executor(command, scriptsFor(identity)[command]);
   if (command === 'status') {
     try { return JSON.parse(output); }

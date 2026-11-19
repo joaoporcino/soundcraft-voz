@@ -22,6 +22,7 @@ test('install gera tarefa de logon oculta e limitada sem sobrescrever', async ()
     assert.doesNotMatch(script, /Register-ScheduledTask[^\n]*-Force/);
     assert.ok(script.includes("$expectedExecute = 'C:\\Program Files\\nodejs\\node.exe'"));
     assert.ok(script.includes('$expectedArguments = \'"C:\\Sound Craft\\App\\src\\local-service-cli.js" start\''));
+    assert.ok(script.includes("-WorkingDirectory 'C:\\Sound Craft\\App\\src'"));
     return 'installed';
   });
   assert.equal(calls, 1);

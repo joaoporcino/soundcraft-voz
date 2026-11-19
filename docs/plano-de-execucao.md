@@ -49,6 +49,12 @@ Para acompanhar o que depende de você, consulte [suas pendências](suas-pendenc
 - [x] Implementar verificador de campos e destinos locais de links inline com testes de sucesso e falha, documentar comando e configurar etapa no CI; links por referência, HTML e âncoras não são verificados.
 - [x] Executar verificações locais aplicáveis e registrar resultados; execução remota do CI e validações reais permanecem pendentes.
 
+### Correção do CI após sincronização
+
+O CI do commit `05ede9a` falhou no Linux em dois testes da tarefa Windows porque a simulação interpretou caminhos Windows com as regras do sistema anfitrião. Ajustar a construção e o diretório de trabalho com semântica Windows e verificar os argumentos no teste simulado; executar os testes locais e acompanhar nova execução remota. Nenhuma tarefa agendada real é instalada.
+
+Correção implementada com `path.win32` para o executável e diretório da tarefa; seis testes simulados passaram no Windows local, bem como ESLint e verificação documental. A execução remota da correção ainda precisa ser conferida.
+
 ## Auditoria técnica de 17/11/2026
 
 **Escopo:** análise do estado local atual, incluindo alterações ainda não versionadas; revisão da arquitetura, integrações, testes, recuperação e segurança operacional. Esta rodada não altera o comportamento do aplicativo nem executa operações em mesa, microfone, provedor pago ou Agendador reais.
