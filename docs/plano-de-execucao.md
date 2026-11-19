@@ -16,7 +16,7 @@ Para acompanhar o que depende de você, consulte [suas pendências](suas-pendenc
 
 **Ainda não implementado como produto completo:** serviço validado com voz e mesa reais, painel com acesso de rede e funcionalidades completas, cadastro completo de retornos, respostas faladas e roteamento individual real e integração Holyrics. Gemini, OpenAI e Anthropic estão integrados com seleção persistente e limite de tentativas, testados apenas com transporte falso; limites financeiros e provedores reais seguem pendentes. A fila de respostas integrada é apenas simulação; múltiplas entradas e conversas exigem validação com dispositivos reais.
 
-**Evidências registradas:** em 18/11, após ampliar a revisão no painel, `npm test -- --test-timeout=30000 --test-concurrency=4` passou 276/276 fora do sandbox com loopback e dependências simuladas. ESLint e verificação documental passaram. Python 3.12: pytest 21/21 e Ruff check aprovados. A execução remota do CI, a apresentação em navegador real, microfone/Whisper e mesa físicos, provedores reais e inicialização após reinício ainda não foram verificados. Os registros preservam resultados de cada rodada, não o estado atual por si só.
+**Evidências registradas:** em 18/11, após ampliar a revisão no painel, `npm test -- --test-timeout=30000 --test-concurrency=4` passou 276/276 fora do sandbox com loopback e dependências simuladas. ESLint e verificação documental passaram. Python 3.12: pytest 21/21 e Ruff check aprovados. O [CI do commit 588a2e5](https://github.com/joaoporcino/soundcraft-voz/actions/runs/44445307720) passou em Node e Python, Windows e Linux. A apresentação em navegador real, microfone/Whisper e mesa físicos, provedores reais e inicialização após reinício ainda não foram verificados. Os registros preservam resultados de cada rodada, não o estado atual por si só.
 
 **Recorte proposto para o primeiro piloto, ainda a confirmar:** um operador configura a conexão pelo terminal, solicita mute ou fader de entrada por texto ou uma captura manual de voz, revisa e confirma a proposta e recebe o resultado conhecido. Resposta no ouvido e seleção de LLM ficam como marcos posteriores desse piloto, a menos que sejam definidas como indispensáveis. A preparação e os testes simulados podem avançar enquanto se aguarda equipamento; o piloto com mesa exige teste controlado e evidência própria.
 
@@ -47,13 +47,13 @@ Para acompanhar o que depende de você, consulte [suas pendências](suas-pendenc
 
 - [x] Corrigir divergências conhecidas e padronizar estado, integração e validação das especificações, confrontando os resumos com código e evidências registradas. Isso não comprova ausência de outras divergências semânticas.
 - [x] Implementar verificador de campos e destinos locais de links inline com testes de sucesso e falha, documentar comando e configurar etapa no CI; links por referência, HTML e âncoras não são verificados.
-- [x] Executar verificações locais aplicáveis e registrar resultados; execução remota do CI e validações reais permanecem pendentes.
+- [x] Executar verificações locais aplicáveis e registrar resultados; na rodada original, o CI remoto e as validações reais ainda estavam pendentes. O CI foi confirmado posteriormente; as validações reais seguem pendentes.
 
 ### Correção do CI após sincronização
 
 O CI do commit `05ede9a` falhou no Linux em dois testes da tarefa Windows porque a simulação interpretou caminhos Windows com as regras do sistema anfitrião. Ajustar a construção e o diretório de trabalho com semântica Windows e verificar os argumentos no teste simulado; executar os testes locais e acompanhar nova execução remota. Nenhuma tarefa agendada real é instalada.
 
-Correção implementada com `path.win32` para o executável e diretório da tarefa; seis testes simulados passaram no Windows local, bem como ESLint e verificação documental. A execução remota da correção ainda precisa ser conferida.
+Correção implementada com `path.win32` para o executável e diretório da tarefa; seis testes simulados passaram no Windows local, bem como ESLint e verificação documental. O CI remoto do commit `588a2e5` passou em Windows e Linux, incluindo esses testes; a tarefa agendada física não foi instalada nem testada.
 
 ## Auditoria técnica de 17/11/2026
 
@@ -77,7 +77,7 @@ Correção implementada com `path.win32` para o executável e diretório da tare
 **Validação de 17/11:** `npm test` 121/121; `npm run lint` aprovado; pytest 14/14; Ruff check e format aprovados; `git diff --check` aprovado com avisos de CRLF. Python 3.14 usado nos testes simulados; lançador `py` indisponível. Não foram testados Python 3.12, microfone, modelo, Gemini ou mesa reais. Não houve instalação de dependências de áudio.
 - [ ] Preparar ambiente suportado de voz e testar worker real explicitamente. [Diagnóstico de dependências](especificacoes/diagnostico-voz.md) implementado e testado; `.venv/voice312` foi criado com Python 3.12.14 do runtime do Codex e dependências instaladas, com importações e `pip check` aprovados. Esse ambiente depende da instalação do runtime e não é distribuição definitiva. Worker com modelo e microfone reais seguem pendentes.
 - [x] Especificar e integrar uma fatia ponta a ponta com mesa e provedor simulados, passando por origem, modo, ativação, proposta, confirmação e validação final. Sete testes automatizados verificaram recusa, cancelamento, queda e resposta tardia: [contrato da fatia](especificacoes/fluxo-simulado.md). A integração ao serviço e equipamento real continua pendente; conexão aqui é apenas sinal simulado.
-- [ ] Ampliar CI para Windows e versões suportadas e conferir execução no GitHub após envio. Matriz Windows/Linux configurada para Node 22 e Python 3.12, ainda sem execução verificada no GitHub. Sem instalar tarefa, acessar hardware ou usar provedor pago no pipeline padrão.
+- [x] Ampliar CI para Windows e versões suportadas e conferir execução no GitHub após envio. Matriz Windows/Linux com Node 22 e Python 3.12 aprovada no commit `588a2e5`, sem instalar tarefa, acessar hardware ou usar provedor pago.
 
 ## Fase inicial — Base de qualidade
 
@@ -89,7 +89,7 @@ Correção implementada com `path.win32` para o executável e diretório da tare
 - [x] Implementar dois simuladores complementares conforme [especificação de mesa simulada](especificacoes/mesa-simulada.md): estado em memória para testes de regras e servidor WebSocket local para exercitar a biblioteca real. Conexão, mute, fader, mensagem inválida, queda e reconexão foram testados localmente; fidelidade com equipamento real permanece pendente.
 - [x] Criar terminal interativo para visualizar e manipular 24 canais virtuais, com servidor WebSocket em loopback e estado compartilhado com o aplicativo. Comandos, erros, saída e alteração entre terminal e biblioteca real foram testados sem mesa física. A demonstração web da Soundcraft é referência externa; integração com ela não está comprovada nem é requisito.
 - [x] Configurar workflow GitHub Actions para lint e testes em Windows/Linux sem hardware ou chamadas pagas. O arquivo está no projeto; a execução remota permanece pendente abaixo.
-- [ ] Confirmar execução do workflow no GitHub após envio das alterações; registrar resultado e eventuais correções.
+- [x] Confirmar execução do workflow no GitHub após envio das alterações; a execução do commit `588a2e5` passou após correção dos caminhos Windows.
 - [x] Preparar formato de casos para avaliação de voz e LLM, incluindo resultados esperados e ações proibidas, preservando privacidade dos áudios: [cenários iniciais](avaliacoes.md). A execução das avaliações ainda depende da implementação e de amostras apropriadas.
 - [ ] Depois de estabilizar os comandos locais e o CI, avaliar hook Git local opcional para verificações rápidas, com instruções de instalação e sem hardware ou chamadas pagas.
 
