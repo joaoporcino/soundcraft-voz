@@ -1,10 +1,10 @@
-# Respostas individuais e alternativa no PA
-
 ## Situação atual
 
 - Estado: Política e fila de respostas simuladas implementadas.
 - Integração: Serviço local e terminal; síntese e roteamento real não implementados.
 - Validação: Testes em memória e HTTP com serviço simulado; isolamento, volume e saída física pendentes.
+
+# Respostas individuais e alternativa no PA
 
 ## Estado e objetivo
 

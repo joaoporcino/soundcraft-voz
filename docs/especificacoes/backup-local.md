@@ -1,12 +1,14 @@
-# Backup e restauração local
-
 ## Situação atual
 
 - Estado: Backup e restauração implementados.
 - Integração: CLI e cadastro SQLite; restauração exige serviço encerrado.
 - Validação: Testes com diretórios temporários; recuperação no ambiente real pendente.
 
+# Backup e restauração local
+
 ## Limite de leitura na restauração
+
+O estado de LLM criado na área temporária de restauração usa caminho estendido no Windows, para evitar falha reproduzida em caminho longo. Esquema e formato foram preservados; testes de restauração longa e regressão de backups passaram no Windows. Isso não prova suporte a caminhos longos em todas as operações ou sistemas.
 
 Na restauração, abrir o arquivo e ler no máximo o limite permitido mais um byte, recusando entradas maiores antes de analisar ou criar o destino. A leitura deve continuar limitada mesmo se o arquivo crescer durante a operação; fechar o arquivo também em caso de erro. Testar arquivo grande, preservação do destino e restauração regular com dados temporários. Esta proteção não autentica a origem do backup.
 
@@ -28,7 +30,7 @@ Permitir exportar e recuperar os dados locais do Soundcraft Voz, preservando cad
 - Restaurar somente em diretório novo ou totalmente vazio, para impedir sobrescrita de cadastros, configuração ou banco em uso; rejeitar arquivos inválidos ou incompatíveis sem alterar dados existentes.
 - Não realizar chamadas à mesa, alterar estado de shows/snapshots nela, importar configurações para a mesa, nem iniciar conexões ou comandos durante backup/restauração.
 - Não incluir credenciais, tokens, variáveis de ambiente, gravações/modelos de áudio ou dados externos ao escopo declarado. A configuração IP não é credencial.
-- Não adicionar interface gráfica nem manipular dados reais do usuário durante o desenvolvimento. Testes usam diretórios e bancos temporários. O backup reconhece schemas SQLite canônicos v1 a v6 independentemente da versão do arquivo e valida invariantes de cadastros, caminhos, vínculos de entrada e histórico de correções.
+- Não adicionar interface gráfica nem manipular dados reais do usuário durante o desenvolvimento. Testes usam diretórios e bancos temporários. O backup reconhece schemas SQLite canônicos v1 a v7 independentemente da versão do arquivo e valida invariantes de cadastros, caminhos, vínculos de entrada, histórico de correções e equipes.
 
 ## Comportamento, formato e segurança
 
@@ -73,6 +75,8 @@ O terminal também foi testado em processos separados; recusa backup existente e
 **Configuração AUX:** testes direcionados de banco e backup aprovaram restauração de schemas v1/v2 anteriores, v3 sem configuração e v3 com quantidade explícita, além de recusar quantidade inconsistente com retorno cadastrado mesmo com checksum recalculado. A migração registra o limite legado sem afirmar validação física.
 
 ## Questões abertas e decisões
+
+- Em 19/11/2026, um ensaio com diretório temporário longo no sandbox falhou ao abrir o banco auxiliar durante a restauração; o roteiro equivalente passou no diretório temporário normal do Windows e uma tentativa mais curta passou no sandbox. A abertura SQLite isolada falhou em 255 caracteres sem caminho estendido e passou com ele. Após a correção, o ensaio longo passou; não se testou falha abrupta nem todos os demais caminhos SQLite longos.
 
 - `VACUUM INTO` foi validado localmente na versão Node.js instalada (24.21.0); a compatibilidade efetiva com o mínimo Node.js 22.13 ainda precisa ser confirmada no CI.
 - Restauração não tem opção de sobrescrita nesta fatia: o destino precisa ser novo ou vazio; para recuperar o diretório atualmente usado, o serviço deve ser interrompido e o operador precisa preparar um caminho vazio separado.

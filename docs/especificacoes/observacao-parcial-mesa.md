@@ -1,10 +1,10 @@
-# Observação parcial do estado da mesa
-
 ## Situação atual
 
 - Estado: Observação parcial de mute e fader implementada.
 - Integração: Serviço reporta apenas valores recebidos na conexão atual.
 - Validação: Testes com biblioteca e servidor simulados; sincronização física pendente.
+
+# Observação parcial do estado da mesa
 
 ## Objetivo e vínculo
 

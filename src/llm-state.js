@@ -44,7 +44,7 @@ export function validateLlmStateDatabase(db) {
 
 export function createLlmState({ directory, now = () => new Date() } = {}) {
   if (directory) mkdirSync(directory, { recursive: true });
-  const db = new DatabaseSync(directory ? path.join(directory, LLM_STATE_FILE) : ':memory:');
+  const db = new DatabaseSync(directory ? path.toNamespacedPath(path.join(directory, LLM_STATE_FILE)) : ':memory:');
   db.exec('PRAGMA busy_timeout=5000');
   try {
     const count = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").get().n;

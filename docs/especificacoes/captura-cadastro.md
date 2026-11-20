@@ -4,7 +4,14 @@
 - Integração: Captura manual identificada, serviço autenticado e passagem guiada.
 - Validação: Parser e serviço HTTP com worker e mesa simulados; áudio, Whisper e equipamentos reais pendentes.
 
+
+**Entrega em 20/11/2026:** o CMD corrige fonte e voz com revisão da proposta e das referências selecionadas na mesma transação; voz admite desconhecido. Os comandos anteriores permanecem disponíveis. Doze testes específicos com bancos temporários cobriram concorrência entre conexões, cancelamento e recusas; suíte Node 362/362, ESLint e verificação documental passaram. A recarga da tela foi conferida em 45 testes do menu. Não houve alteração de esquema ou backup, nem validação física. Tokens não autenticam, não comprovam estado físico e não detectam mudanças revertidas.
+
 # Captura para revisão de cadastros
+
+O CMD permite confirmar ou rejeitar proposta de voz pelo detalhe da sessão, mostrando frase, origem e campos reconhecidos. Ambas usam revisão transacional da passagem; confirmação mantém validação de patch. A revisão não cobre referências relacionadas, não inicia captura nem chama a mesa. Testes com banco temporário cobrem proposta incompleta, rejeição e confirmação com patch declarado; os testes da tela comum também cobrem cancelamento.
+
+O CMD corrige proposta de voz por seleção explícita de pessoa e equipamento ou opção desconhecida, além de canal conhecido ou desconhecido. As revisões da proposta e das referências selecionadas são verificadas transacionalmente; a correção não confirma automaticamente. Testes cobrem campos parciais e alteração observada durante a seleção; cancelamento é exercitado no fluxo comum de formulários.
 
 Na fase 4, oferecer operação explícita de captura para proposta de cadastro, separada do caminho de interpretação e execução de comandos da mesa. A captura exige sessão ativa e origem habilitada/vinculada; conserva texto reconhecido e origem sem atribuir identidade ao falante. A análise usa o parser restrito existente e registra propostas incompletas quando necessário; ausência de dados, ambiguidades e conflitos produzem esclarecimento, nunca confirmação automática. A passagem permite revisar, corrigir, confirmar ou rejeitar conforme suas regras e a confirmação não comprova patch físico.
 

@@ -1,10 +1,10 @@
-# Fluxo integrado de comandos simulados
-
 ## Situação atual
 
 - Estado: Fluxo demonstrativo implementado.
 - Integração: Componentes em simulação; serviço possui integração própria e limitada.
 - Validação: Testes determinísticos; provedor e mesa físicos não testados.
+
+# Fluxo integrado de comandos simulados
 
 ## Estado e vínculo
 

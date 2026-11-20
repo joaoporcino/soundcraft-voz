@@ -1,10 +1,10 @@
-# Integração opcional de LLM ao serviço
-
 ## Situação atual
 
 - Estado: Integração com provedores e limite persistente implementada em simulação.
 - Integração: Serviço e terminal locais; Gemini, OpenAI e Anthropic opcionais.
 - Validação: Testes de componentes e HTTP locais passaram com transporte simulado; nenhuma chamada real ou teste em equipamento físico.
+
+# Integração opcional de LLM ao serviço
 
 ## Decisão e escopo
 

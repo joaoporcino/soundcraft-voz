@@ -1,10 +1,10 @@
-# Inicialização do serviço no Windows
-
 ## Situação atual
 
 - Estado: Comandos de tarefa de login implementados.
 - Integração: Agendador é alterado apenas por ação explícita.
 - Validação: Executor simulado; instalação, reinício e áudio reais pendentes.
+
+# Inicialização do serviço no Windows
 
 ## Estado e vínculo
 

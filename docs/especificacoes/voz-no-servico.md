@@ -1,10 +1,10 @@
-# Controle do worker de voz no serviço
-
 ## Situação atual
 
 - Estado: Controlador de voz manual implementado.
 - Integração: Serviço encaminha transcrições de entradas identificadas ao fluxo de comandos.
 - Validação: Worker simulado; microfone e modelo reais pendentes.
+
+# Controle do worker de voz no serviço
 
 ## Objetivo e vínculo
 

@@ -1,10 +1,10 @@
-# Serviço local e terminal administrativo
-
 ## Situação atual
 
 - Estado: Serviço e terminal administrativo implementados.
 - Integração: Entradas identificadas, comandos confirmados, captura manual e LLM opcional integrados.
 - Validação: Testes simulados; reinício, voz e mesa reais pendentes.
+
+# Serviço local e terminal administrativo
 
 ## Estado e vínculo
 

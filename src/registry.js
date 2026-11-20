@@ -1,9 +1,29 @@
 import { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { assertSoundcheckRevision, soundcheckRevision } from './soundcheck-review.js';
+import { assertTeamSessionRevision } from './team-session-review.js';
+import { physicalRevision } from './physical-review.js';
 
 const SCHEMA_VERSION = 7;
 const MAX_SAFE_SQLITE_INTEGER = 9007199254740991;
+const REVISED_RETURN_FIELDS = Object.freeze({
+  sessao: ['id', 'name'],
+  pessoa: ['id', 'name'],
+  'aux-config': ['auxCount', 'source'],
+  'retorno-cadastro': ['id', 'sessionId', 'aux', 'confirmedPeople'],
+});
+
+export function registryContentRevision(type, item) {
+  const fields = REVISED_RETURN_FIELDS[type];
+  if (!fields || !item || fields.some(field => !Object.hasOwn(item, field))) throw new TypeError('Registro de revisão inválido');
+  return createHash('sha256').update(JSON.stringify([type, ...fields.map(field => item[field])])).digest('hex');
+}
+
+function assertRegistryContentRevision(type, item, expected) {
+  if (typeof expected !== 'string' || !/^[a-f0-9]{64}$/.test(expected) || registryContentRevision(type, item) !== expected) {
+    throw new Error('Cadastro alterado desde a revisão; consulte novamente');
+  }
+}
 
 function requiredText(value, field, maxLength = 200) {
   if (typeof value !== 'string' || value.trim().length === 0 || value.length > maxLength) {
@@ -325,6 +345,28 @@ export function openRegistry(path) {
     const voiceSelect = `SELECT id, session_id AS sessionId, phrase, origin, person_id AS personId,
       equipment_id AS equipmentId, channel, status, assignment_id AS assignmentId FROM voice_proposals`;
 
+    function checkCorrectionReferences(revisions, personId, equipmentId, expectedRevision, sessionId, actualSessionId) {
+      if (revisions === undefined) return;
+      if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions) ||
+          Object.keys(revisions).sort().join(',') !== 'equipamento,pessoa' ||
+          typeof expectedRevision !== 'string' || !/^[a-f0-9]{64}$/.test(expectedRevision) ||
+          !Number.isSafeInteger(sessionId) || sessionId < 1 || sessionId !== actualSessionId) throw new Error('Revisões ou sessão inválidas');
+      for (const [type, id, sql] of [
+        ['pessoa', personId, 'SELECT id,name FROM people WHERE id=?'],
+        ['equipamento', equipmentId, 'SELECT id,name,kind,color,wireless,capsule,model FROM equipment WHERE id=?'],
+      ]) {
+        const token = revisions[type];
+        if (id === null) {
+          if (token !== null) throw new Error('Revisões das referências inválidas');
+          continue;
+        }
+        if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) throw new Error('Revisões das referências inválidas');
+        let record = db.prepare(sql).get(id);
+        if (record && type === 'equipamento') record = { ...record, wireless: record.wireless === null ? null : Boolean(record.wireless) };
+        if (!record || soundcheckRevision(type, record) !== token) throw new Error('Referência alterada ou removida desde a revisão');
+      }
+    }
+
     function atomic(action) {
       db.exec('BEGIN IMMEDIATE');
       try { const result = action(); db.exec('COMMIT'); return result; }
@@ -350,6 +392,18 @@ export function openRegistry(path) {
       }
       return teams;
     }
+    function teamRecord(id) { return db.prepare('SELECT id,name FROM teams WHERE id=?').get(id); }
+    function personRecord(id) { return db.prepare('SELECT id,name FROM people WHERE id=?').get(id); }
+    function sessionRecord(id) { return db.prepare('SELECT id,name FROM sessions WHERE id=?').get(id); }
+    function teamMemberRecord(teamId, personId) {
+      const row = db.prepare(`SELECT m.team_id AS teamId,m.person_id AS personId,p.name AS personName FROM team_members m
+        JOIN people p ON p.id=m.person_id WHERE m.team_id=? AND m.person_id=?`).get(teamId, personId);
+      if (!row) return undefined;
+      return { ...row, roles: db.prepare(`SELECT r.id,r.name FROM team_member_roles mr JOIN roles r ON r.id=mr.role_id
+        WHERE mr.team_id=? AND mr.person_id=? ORDER BY r.id`).all(teamId, personId) };
+    }
+    function formationTeam(formation, teamId) { return formation.find(item => item.id === teamId); }
+    function formationMember(team, personId) { return team?.members.find(item => item.id === personId); }
     function auth(authorized) {
       if (authorized !== true) throw new Error('Operação não autorizada');
     }
@@ -471,9 +525,29 @@ export function openRegistry(path) {
         db.prepare('INSERT INTO team_members(team_id,person_id) VALUES(?,?)').run(teamId, personId);
         return { teamId, personId };
       },
+      addTeamMemberReviewed({ teamId, personId, expectedRevision } = {}) {
+        validId(teamId, 'teamId'); validId(personId, 'personId');
+        return atomic(() => {
+          const team = teamRecord(teamId), person = personRecord(personId);
+          if (!team || !person) throw new Error('Grupo ou pessoa não encontrado');
+          assertTeamSessionRevision('team-member:add', { team, person }, expectedRevision);
+          if (teamMemberRecord(teamId, personId)) throw new Error('Pessoa já integrante deste grupo');
+          db.prepare('INSERT INTO team_members(team_id,person_id) VALUES(?,?)').run(teamId, personId);
+          return { teamId, personId };
+        });
+      },
       removeTeamMember({ teamId, personId } = {}) {
         validId(teamId, 'teamId'); validId(personId, 'personId');
         return db.prepare('DELETE FROM team_members WHERE team_id=? AND person_id=?').run(teamId, personId).changes === 1;
+      },
+      removeTeamMemberReviewed({ teamId, personId, expectedRevision } = {}) {
+        validId(teamId, 'teamId'); validId(personId, 'personId');
+        return atomic(() => {
+          const team = teamRecord(teamId), member = teamMemberRecord(teamId, personId);
+          if (!team || !member) throw new Error('Grupo ou integrante não encontrado');
+          assertTeamSessionRevision('team-member:remove', { team, member }, expectedRevision);
+          return db.prepare('DELETE FROM team_members WHERE team_id=? AND person_id=?').run(teamId, personId).changes === 1;
+        });
       },
       listTeamMembers(teamId) {
         validId(teamId, 'teamId');
@@ -488,36 +562,135 @@ export function openRegistry(path) {
         db.prepare('INSERT INTO team_member_roles(team_id,person_id,role_id) VALUES(?,?,?)').run(teamId, personId, roleId);
         return { teamId, personId, roleId };
       },
+      addTeamMemberRoleReviewed({ teamId, personId, roleId, expectedRevision } = {}) {
+        validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
+        return atomic(() => {
+          const team = teamRecord(teamId), member = teamMemberRecord(teamId, personId);
+          const role = db.prepare('SELECT id,name FROM roles WHERE id=?').get(roleId);
+          if (!team || !member || !role) throw new Error('Grupo, integrante ou função não encontrado');
+          assertTeamSessionRevision('team-role:add', { team, member, role }, expectedRevision);
+          if (member.roles.some(item => item.id === roleId)) throw new Error('Função já vinculada ao integrante');
+          db.prepare('INSERT INTO team_member_roles(team_id,person_id,role_id) VALUES(?,?,?)').run(teamId, personId, roleId);
+          return { teamId, personId, roleId };
+        });
+      },
       removeTeamMemberRole({ teamId, personId, roleId } = {}) {
         validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
         return db.prepare('DELETE FROM team_member_roles WHERE team_id=? AND person_id=? AND role_id=?').run(teamId, personId, roleId).changes === 1;
+      },
+      removeTeamMemberRoleReviewed({ teamId, personId, roleId, expectedRevision } = {}) {
+        validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
+        return atomic(() => {
+          const team = teamRecord(teamId), member = teamMemberRecord(teamId, personId);
+          const role = db.prepare('SELECT id,name FROM roles WHERE id=?').get(roleId);
+          if (!team || !member || !role) throw new Error('Grupo, integrante ou função não encontrado');
+          assertTeamSessionRevision('team-role:remove', { team, member, role }, expectedRevision);
+          if (!member.roles.some(item => item.id === roleId)) throw new Error('Função não vinculada ao integrante');
+          return db.prepare('DELETE FROM team_member_roles WHERE team_id=? AND person_id=? AND role_id=?').run(teamId, personId, roleId).changes === 1;
+        });
       },
       addSessionTeam({ sessionId, teamId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId');
         db.prepare('INSERT INTO session_teams(session_id,team_id) VALUES(?,?)').run(sessionId, teamId);
         return { sessionId, teamId };
       },
+      addSessionTeamReviewed({ sessionId, teamId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId), team = teamRecord(teamId);
+          if (!session || !team) throw new Error('Sessão ou grupo não encontrado');
+          const formation = sessionFormation(sessionId);
+          assertTeamSessionRevision('session-team:add', { session, team, formation }, expectedRevision);
+          if (formationTeam(formation, teamId)) throw new Error('Grupo já associado à sessão');
+          db.prepare('INSERT INTO session_teams(session_id,team_id) VALUES(?,?)').run(sessionId, teamId);
+          return { sessionId, teamId };
+        });
+      },
       removeSessionTeam({ sessionId, teamId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId');
         return db.prepare('DELETE FROM session_teams WHERE session_id=? AND team_id=?').run(sessionId, teamId).changes === 1;
+      },
+      removeSessionTeamReviewed({ sessionId, teamId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          const formation = sessionFormation(sessionId), team = formationTeam(formation, teamId);
+          if (!team) throw new Error('Grupo não associado à sessão');
+          assertTeamSessionRevision('session-team:remove', { session, team, formation }, expectedRevision);
+          return db.prepare('DELETE FROM session_teams WHERE session_id=? AND team_id=?').run(sessionId, teamId).changes === 1;
+        });
       },
       addSessionMember({ sessionId, teamId, personId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId');
         db.prepare('INSERT INTO session_members(session_id,team_id,person_id) VALUES(?,?,?)').run(sessionId, teamId, personId);
         return { sessionId, teamId, personId };
       },
+      addSessionMemberReviewed({ sessionId, teamId, personId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          const formation = sessionFormation(sessionId), team = formationTeam(formation, teamId);
+          const member = teamMemberRecord(teamId, personId);
+          if (!team || !member) throw new Error('Grupo não associado ou integrante não encontrado');
+          assertTeamSessionRevision('session-member:add', { session, team, member, formation }, expectedRevision);
+          if (formationMember(team, personId)) throw new Error('Integrante já participa desta sessão');
+          db.prepare('INSERT INTO session_members(session_id,team_id,person_id) VALUES(?,?,?)').run(sessionId, teamId, personId);
+          return { sessionId, teamId, personId };
+        });
+      },
       removeSessionMember({ sessionId, teamId, personId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId');
         return db.prepare('DELETE FROM session_members WHERE session_id=? AND team_id=? AND person_id=?').run(sessionId, teamId, personId).changes === 1;
+      },
+      removeSessionMemberReviewed({ sessionId, teamId, personId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          const formation = sessionFormation(sessionId), team = formationTeam(formation, teamId);
+          const member = teamMemberRecord(teamId, personId);
+          if (!team || !member || !formationMember(team, personId)) throw new Error('Participação ou integrante não encontrado');
+          assertTeamSessionRevision('session-member:remove', { session, team, member, formation }, expectedRevision);
+          return db.prepare('DELETE FROM session_members WHERE session_id=? AND team_id=? AND person_id=?').run(sessionId, teamId, personId).changes === 1;
+        });
       },
       addSessionRole({ sessionId, teamId, personId, roleId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
         db.prepare('INSERT INTO session_roles(session_id,team_id,person_id,role_id) VALUES(?,?,?,?)').run(sessionId, teamId, personId, roleId);
         return { sessionId, teamId, personId, roleId };
       },
+      addSessionRoleReviewed({ sessionId, teamId, personId, roleId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          const formation = sessionFormation(sessionId), team = formationTeam(formation, teamId);
+          const participant = formationMember(team, personId), role = db.prepare('SELECT id,name FROM roles WHERE id=?').get(roleId);
+          if (!team || !participant || !role) throw new Error('Grupo, participante ou papel não encontrado');
+          assertTeamSessionRevision('session-role:add', { session, team, participant, role, formation }, expectedRevision);
+          if (participant.roles.some(item => item.id === roleId)) throw new Error('Papel já atribuído nesta sessão');
+          db.prepare('INSERT INTO session_roles(session_id,team_id,person_id,role_id) VALUES(?,?,?,?)').run(sessionId, teamId, personId, roleId);
+          return { sessionId, teamId, personId, roleId };
+        });
+      },
       removeSessionRole({ sessionId, teamId, personId, roleId } = {}) {
         validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
         return db.prepare('DELETE FROM session_roles WHERE session_id=? AND team_id=? AND person_id=? AND role_id=?').run(sessionId, teamId, personId, roleId).changes === 1;
+      },
+      removeSessionRoleReviewed({ sessionId, teamId, personId, roleId, expectedRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(teamId, 'teamId'); validId(personId, 'personId'); validId(roleId, 'roleId');
+        return atomic(() => {
+          const session = sessionRecord(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          const formation = sessionFormation(sessionId), team = formationTeam(formation, teamId);
+          const participant = formationMember(team, personId), role = db.prepare('SELECT id,name FROM roles WHERE id=?').get(roleId);
+          if (!team || !participant || !role) throw new Error('Grupo, participante ou papel não encontrado');
+          assertTeamSessionRevision('session-role:remove', { session, team, participant, role, formation }, expectedRevision);
+          if (!participant.roles.some(item => item.id === roleId)) throw new Error('Papel não atribuído nesta sessão');
+          return db.prepare('DELETE FROM session_roles WHERE session_id=? AND team_id=? AND person_id=? AND role_id=?').run(sessionId, teamId, personId, roleId).changes === 1;
+        });
       },
       listSessionFormation(sessionId) {
         return sessionFormation(sessionId);
@@ -541,8 +714,14 @@ export function openRegistry(path) {
           FROM input_sources i JOIN assignments a ON a.id=i.assignment_id AND a.session_id=i.session_id
           WHERE i.session_id=? AND a.status='confirmado' AND NOT EXISTS(SELECT 1 FROM retired_assignments r WHERE r.assignment_id=a.id) ORDER BY i.input_id`).all(sessionId);
       },
-      unbindInputSource({ sessionId, inputId } = {}) {
+      unbindInputSource({ sessionId, inputId, expectedBindingId } = {}) {
         validId(sessionId, 'sessionId'); validInputId(inputId);
+        if (expectedBindingId !== undefined) {
+          if (typeof expectedBindingId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(expectedBindingId)) throw new TypeError('Identidade da associação inválida');
+          const result = db.prepare('DELETE FROM input_sources WHERE session_id=? AND input_id=? AND binding_id=?').run(sessionId, inputId, expectedBindingId);
+          if (result.changes !== 1) throw new Error('Associação alterada ou removida desde a revisão');
+          return true;
+        }
         return db.prepare('DELETE FROM input_sources WHERE session_id=? AND input_id=?').run(sessionId, inputId).changes === 1;
       },
       proposeAssignment(input) {
@@ -551,20 +730,41 @@ export function openRegistry(path) {
         let { channel = null } = input;
         validId(sessionId, 'sessionId'); validId(personId, 'personId'); validId(equipmentId, 'equipmentId');
         if (channel !== null && (!Number.isInteger(channel) || channel < 1 || channel > 24)) throw new RangeError('channel deve ser null ou inteiro entre 1 e 24');
-        return statements.addAssignment.get(sessionId, personId, equipmentId, channel);
+        if (input.expectedReferences === undefined) return statements.addAssignment.get(sessionId, personId, equipmentId, channel);
+        const revisions = input.expectedReferences;
+        if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions) ||
+            Object.keys(revisions).sort().join(',') !== 'equipamento,pessoa,sessao' ||
+            Object.values(revisions).some(value => typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value))) {
+          throw new Error('Revisões das referências inválidas');
+        }
+        return atomic(() => {
+          const session = db.prepare('SELECT id, name FROM sessions WHERE id=?').get(sessionId);
+          const person = db.prepare('SELECT id, name FROM people WHERE id=?').get(personId);
+          const row = db.prepare('SELECT id, name, kind, color, wireless, capsule, model FROM equipment WHERE id=?').get(equipmentId);
+          const equipment = row && { ...row, wireless: row.wireless === null ? null : Boolean(row.wireless) };
+          for (const [type, record] of [['sessao', session], ['pessoa', person], ['equipamento', equipment]]) {
+            if (!record || soundcheckRevision(type, record) !== revisions[type]) throw new Error('Referência alterada ou removida desde a revisão');
+          }
+          return statements.addAssignment.get(sessionId, personId, equipmentId, channel);
+        });
       },
-      editAssignment(id, { personId, equipmentId, channel = null, expectedRevision } = {}) {
+      editAssignment(id, { personId, equipmentId, channel = null, expectedRevision, expectedReferences, sessionId } = {}) {
         validId(id, 'id'); validId(personId, 'personId'); validId(equipmentId, 'equipmentId');
         if (channel !== null && (!Number.isInteger(channel) || channel < 1 || channel > 24)) throw new RangeError('channel deve ser null ou inteiro entre 1 e 24');
         return atomic(() => {
           const assignment = statements.assignment.get(id);
           if (!assignment || assignment.status !== 'proposto') throw new Error('Vínculo proposto não encontrado');
           assertSoundcheckRevision('vinculo', assignment, expectedRevision);
+          checkCorrectionReferences(expectedReferences, personId, equipmentId, expectedRevision, sessionId, assignment.sessionId);
           return db.prepare(`UPDATE assignments SET person_id=?, equipment_id=?, channel=? WHERE id=? AND status='proposto'
             RETURNING id, session_id AS sessionId, person_id AS personId, equipment_id AS equipmentId, channel, status`).get(personId, equipmentId, channel, id);
         });
       },
-      replaceConfirmedAssignment(id, { sessionId, personId, equipmentId, channel = null, expectedRevision } = {}) {
+      replaceConfirmedAssignmentReviewed(id, input = {}) {
+        if (input.expectedReferences === undefined) throw new Error('Revisões das referências obrigatórias');
+        return this.replaceConfirmedAssignment(id, input);
+      },
+      replaceConfirmedAssignment(id, { sessionId, personId, equipmentId, channel = null, expectedRevision, expectedReferences } = {}) {
         validId(id, 'id'); validId(sessionId, 'sessionId'); validId(personId, 'personId'); validId(equipmentId, 'equipmentId');
         if (expectedRevision === undefined) throw new Error('Revisão obrigatória');
         if (channel !== null && (!Number.isInteger(channel) || channel < 1 || channel > 24)) throw new RangeError('Canal inválido');
@@ -573,6 +773,7 @@ export function openRegistry(path) {
           if (!old || old.sessionId !== sessionId || old.status !== 'confirmado') throw new Error('Vínculo confirmado não encontrado nesta sessão');
           const inputs = db.prepare('SELECT input_id AS inputId,binding_id AS bindingId FROM input_sources WHERE session_id=? AND assignment_id=? ORDER BY input_id').all(sessionId, id);
           assertSoundcheckRevision('substituicao', { ...old, entradasAssociadas: inputs }, expectedRevision);
+          checkCorrectionReferences(expectedReferences, personId, equipmentId, expectedRevision, sessionId, old.sessionId);
           const replacement = statements.addAssignment.get(sessionId, personId, equipmentId, channel);
           db.prepare('INSERT INTO retired_assignments(assignment_id,replacement_id,inputs_json,changed_at) VALUES (?,?,?,?)').run(id, replacement.id, JSON.stringify(inputs), new Date().toISOString());
           db.prepare('DELETE FROM input_sources WHERE session_id=? AND assignment_id=?').run(sessionId, id);
@@ -635,11 +836,47 @@ export function openRegistry(path) {
           return result;
         } catch (error) { db.exec('ROLLBACK'); throw error; }
       },
+      addMonitorReturnReviewed({ sessionId, aux, expectedSessionRevision, expectedConfigRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(aux, 'aux');
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const session = db.prepare('SELECT id,name FROM sessions WHERE id=?').get(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          assertRegistryContentRevision('sessao', session, expectedSessionRevision);
+          const config = statements.getAuxConfig.get();
+          if (!config || config.auxCount === null) throw new Error('Quantidade de AUX não configurada');
+          assertRegistryContentRevision('aux-config', config, expectedConfigRevision);
+          if (aux > config.auxCount) throw new RangeError(`AUX excede a quantidade configurada (${config.auxCount})`);
+          const result = statements.addReturn.get(sessionId, aux);
+          db.exec('COMMIT');
+          return result;
+        } catch (error) { db.exec('ROLLBACK'); throw error; }
+      },
       listMonitorReturns(sessionId) {
         return statements.listReturns.all(validId(sessionId, 'sessionId'));
       },
       proposeMonitorAssignment({ sessionId, personId, returnId } = {}) {
         return statements.proposeMonitor.get(validId(sessionId, 'sessionId'), validId(personId, 'personId'), validId(returnId, 'returnId'));
+      },
+      proposeMonitorAssignmentReviewed({ sessionId, personId, returnId, expectedSessionRevision, expectedPersonRevision, expectedReturnRevision } = {}) {
+        validId(sessionId, 'sessionId'); validId(personId, 'personId'); validId(returnId, 'returnId');
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          const session = db.prepare('SELECT id,name FROM sessions WHERE id=?').get(sessionId);
+          if (!session) throw new Error('Sessão não encontrada');
+          assertRegistryContentRevision('sessao', session, expectedSessionRevision);
+          const person = db.prepare('SELECT id,name FROM people WHERE id=?').get(personId);
+          if (!person) throw new Error('Pessoa não encontrada');
+          assertRegistryContentRevision('pessoa', person, expectedPersonRevision);
+          const monitorReturn = db.prepare(`SELECT r.id,r.session_id AS sessionId,r.aux,
+            (SELECT count(*) FROM monitor_assignments a WHERE a.return_id=r.id AND a.status='confirmado') AS confirmedPeople
+            FROM monitor_returns r WHERE r.id=? AND r.session_id=?`).get(returnId, sessionId);
+          if (!monitorReturn) throw new Error('Retorno não encontrado nesta sessão');
+          assertRegistryContentRevision('retorno-cadastro', monitorReturn, expectedReturnRevision);
+          const result = statements.proposeMonitor.get(sessionId, personId, returnId);
+          db.exec('COMMIT');
+          return result;
+        } catch (error) { db.exec('ROLLBACK'); throw error; }
       },
       confirmMonitorAssignment(id, { expectedRevision } = {}) {
         validId(id, 'id');
@@ -668,13 +905,14 @@ export function openRegistry(path) {
           return result;
         } catch (error) { db.exec('ROLLBACK'); throw error; }
       },
-      revokeMonitorAssignment(id) {
+      revokeMonitorAssignment(id, { expectedRevision } = {}) {
         validId(id, 'id');
         db.exec('BEGIN IMMEDIATE');
         try {
           const item = statements.monitor.get(id);
           if (!item) throw new Error(`Vínculo de retorno ${id} não encontrado`);
           if (item.status !== 'confirmado') throw new Error('Apenas vínculo confirmado pode ser revogado');
+          assertSoundcheckRevision('retorno', item, expectedRevision);
           const result = statements.revokeMonitor.get(id);
           db.exec('COMMIT');
           return result;
@@ -708,6 +946,48 @@ export function openRegistry(path) {
           VALUES(?,?,?,?,?,?,?,?) RETURNING id,type,label,direction,device_id AS deviceId,equipment_id AS equipmentId,
           person_id AS personId,monitor_return_id AS monitorReturnId,channel`).get(type, requiredText(label, 'label'), direction, deviceId, equipmentId, personId, monitorReturnId, channel);
       },
+      addSignalPointRevised(input = {}, { expectedRevisions } = {}) {
+        const { type } = input;
+        const required = { port: ['device'], snake_way: ['device'], equipment: ['equipment'], person: ['person'],
+          monitor_return: ['monitorReturn', 'session', 'sessionId'] }[type];
+        if (!required) throw new Error('Este tipo de ponto não possui referências revisáveis; use o comando legado');
+        const referenceFields = { device: 'deviceId', equipment: 'equipmentId', person: 'personId', monitorReturn: 'monitorReturnId' };
+        const expectedReferenceField = required.map(key => referenceFields[key]).find(Boolean);
+        if (Object.entries(referenceFields).some(([key, field]) => key !== required.find(value => referenceFields[value] === field) && input[field] != null)) {
+          throw new Error('Referência extra sem revisão para este tipo de ponto');
+        }
+        if (!input[expectedReferenceField] && !['channel', 'mix', 'other'].includes(type)) throw new Error('Referência de ponto ausente');
+        if (!expectedRevisions || typeof expectedRevisions !== 'object' || Array.isArray(expectedRevisions) ||
+            Object.keys(expectedRevisions).sort().join(',') !== [...required].sort().join(',') ||
+            Object.entries(expectedRevisions).some(([key, value]) => key !== 'sessionId' && (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)))) {
+          throw new Error('Revisões de ponto ausentes, inesperadas ou inválidas');
+        }
+        if (type === 'monitor_return') validId(expectedRevisions.sessionId, 'sessionId');
+        return atomic(() => {
+          const current = (table, id) => {
+            if (table === 'equipment') {
+              const row = db.prepare('SELECT id,name,kind,color,wireless,capsule,model FROM equipment WHERE id=?').get(id);
+              return row && { ...row, wireless: row.wireless === null ? null : Boolean(row.wireless) };
+            }
+            if (table === 'device') return db.prepare('SELECT id,name,type FROM physical_devices WHERE id=?').get(id);
+            if (table === 'person') return db.prepare('SELECT id,name FROM people WHERE id=?').get(id);
+            if (table === 'session') return db.prepare('SELECT id,name FROM sessions WHERE id=?').get(id);
+            if (table === 'monitorReturn') return db.prepare(`SELECT id,session_id AS sessionId,aux,
+              (SELECT count(*) FROM monitor_assignments a WHERE a.return_id=r.id AND a.status='confirmado') AS confirmedPeople
+              FROM monitor_returns r WHERE id=? AND session_id=?`).get(id, expectedRevisions.sessionId);
+            return undefined;
+          };
+          const idByType = { device: input.deviceId, equipment: input.equipmentId, person: input.personId, monitorReturn: input.monitorReturnId };
+          for (const key of required) {
+            if (key === 'sessionId') continue;
+            const item = key === 'session' ? current('session', expectedRevisions.sessionId) : current(key, idByType[key]);
+            const revisionType = { monitorReturn: 'retorno', session: 'sessao', device: 'dispositivo', equipment: 'equipamento', person: 'pessoa' }[key];
+            if (!item || physicalRevision(revisionType,
+              item) !== expectedRevisions[key]) throw new Error('Referência de ponto alterada ou removida desde a revisão');
+          }
+          return this.addSignalPoint(input);
+        });
+      },
       listSignalPoints() { return db.prepare(`${pointSelect} ORDER BY id`).all(); },
       proposeSignalLink({ sessionId, fromPointId, toPointId = null, kind } = {}) {
         validId(sessionId, 'sessionId'); validId(fromPointId, 'fromPointId');
@@ -719,6 +999,48 @@ export function openRegistry(path) {
         return db.prepare(`INSERT INTO signal_links(session_id,from_point_id,to_point_id,kind,status)
           VALUES(?,?,?,?,'proposto') RETURNING id,session_id AS sessionId,from_point_id AS fromPointId,
           to_point_id AS toPointId,kind,status,confirmation_origin AS confirmationOrigin,confirmed_at AS confirmedAt`).get(sessionId, fromPointId, toPointId, kind);
+      },
+      proposeSignalLinkRevised(input = {}, { expectedRevisions } = {}) {
+        const { sessionId, fromPointId } = input;
+        let { toPointId = null } = input;
+        validId(sessionId, 'sessionId'); validId(fromPointId, 'fromPointId');
+        toPointId = optionalId(toPointId, 'toPointId');
+        const expectedKeys = ['session', 'fromPoint', 'toPoint', 'fromReturn', 'toReturn'];
+        if (!expectedRevisions || typeof expectedRevisions !== 'object' || Array.isArray(expectedRevisions) ||
+            Object.keys(expectedRevisions).sort().join(',') !== [...expectedKeys].sort().join(',')) {
+          throw new Error('Revisões da ligação ausentes ou inesperadas');
+        }
+        const isToken = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+        if (!isToken(expectedRevisions.session) || !isToken(expectedRevisions.fromPoint) ||
+            (toPointId === null ? expectedRevisions.toPoint !== 'desconhecido' : !isToken(expectedRevisions.toPoint))) {
+          throw new Error('Revisões da ligação inválidas');
+        }
+        return atomic(() => {
+          const session = db.prepare('SELECT id,name FROM sessions WHERE id=?').get(sessionId);
+          if (!session || physicalRevision('sessao', session) !== expectedRevisions.session) throw new Error('Sessão alterada ou removida desde a revisão');
+          const checkedPoints = new Map();
+          for (const [key, id] of [['fromPoint', fromPointId], ['toPoint', toPointId]]) {
+            if (id === null) continue;
+            const item = point(id);
+            if (!item || physicalRevision('ponto', item) !== expectedRevisions[key]) throw new Error('Ponto alterado ou removido desde a revisão');
+            validatePointSession(item, sessionId);
+            checkedPoints.set(key, item);
+          }
+          for (const [key, returnKey] of [['fromPoint', 'fromReturn'], ['toPoint', 'toReturn']]) {
+            const item = checkedPoints.get(key);
+            if (!item || item.type !== 'monitor_return') {
+              if (expectedRevisions[returnKey] !== 'desconhecido') throw new Error('Revisão inesperada de retorno');
+              continue;
+            }
+            const monitorReturn = db.prepare(`SELECT id,session_id AS sessionId,aux,
+              (SELECT count(*) FROM monitor_assignments a WHERE a.return_id=r.id AND a.status='confirmado') AS confirmedPeople
+              FROM monitor_returns r WHERE id=? AND session_id=?`).get(item.monitorReturnId, sessionId);
+            if (!monitorReturn || !isToken(expectedRevisions[returnKey]) || physicalRevision('retorno', monitorReturn) !== expectedRevisions[returnKey]) {
+              throw new Error('Retorno alterado, removido ou pertencente a outra sessão desde a revisão');
+            }
+          }
+          return this.proposeSignalLink(input);
+        });
       },
       confirmSignalLink(id, { origin, expectedRevision } = {}) {
         validId(id, 'id'); origin = requiredText(origin, 'origem');
@@ -748,9 +1070,10 @@ export function openRegistry(path) {
           db.prepare("UPDATE signal_links SET status='rejeitado' WHERE id=?").run(id); return link(id);
         });
       },
-      revokeSignalLink(id) {
+      revokeSignalLink(id, { expectedRevision } = {}) {
         validId(id, 'id'); return atomic(() => {
           const item = link(id); if (!item || item.status !== 'confirmado') throw new Error('Ligação confirmada não encontrada');
+          assertSoundcheckRevision('ligacao', item, expectedRevision);
           db.prepare("UPDATE signal_links SET status='revogado' WHERE id=?").run(id); return link(id);
         });
       },
@@ -814,7 +1137,7 @@ export function openRegistry(path) {
       listVoiceProposals(sessionId) { return db.prepare(`${voiceSelect} WHERE session_id=? ORDER BY id`).all(validId(sessionId, 'sessionId')); },
       editVoiceProposal(id, changes = {}) {
         validId(id, 'id'); auth(changes.authorized);
-        if (Object.keys(changes).some(key => !['authorized', 'personId', 'equipmentId', 'channel', 'expectedRevision'].includes(key))) throw new TypeError('Campo não suportado');
+        if (Object.keys(changes).some(key => !['authorized', 'personId', 'equipmentId', 'channel', 'expectedRevision', 'expectedReferences', 'sessionId'].includes(key))) throw new TypeError('Campo não suportado');
         return atomic(() => {
           const item = voice(id); if (!item || item.status !== 'proposto') throw new Error('Proposta pendente não encontrada');
           assertSoundcheckRevision('voz', item, changes.expectedRevision);
@@ -822,6 +1145,7 @@ export function openRegistry(path) {
           const equipmentId = Object.hasOwn(changes, 'equipmentId') ? optionalId(changes.equipmentId, 'equipmentId') : item.equipmentId;
           const channel = Object.hasOwn(changes, 'channel') ? optionalId(changes.channel, 'channel') : item.channel;
           if (channel !== null && channel > 24) throw new RangeError('Canal deve estar entre 1 e 24');
+          checkCorrectionReferences(changes.expectedReferences, personId, equipmentId, changes.expectedRevision, changes.sessionId, item.sessionId);
           db.prepare('UPDATE voice_proposals SET person_id=?, equipment_id=?, channel=? WHERE id=?').run(personId, equipmentId, channel, id);
           return voice(id);
         });

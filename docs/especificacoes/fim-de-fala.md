@@ -1,10 +1,10 @@
-# Gravação com fim por silêncio
-
 ## Situação atual
 
 - Estado: Detecção de silêncio experimental implementada.
 - Integração: Opção do fluxo de voz; não é escuta contínua.
 - Validação: Áudio simulado; limites e uso real não validados.
+
+# Gravação com fim por silêncio
 
 ## Estado e vínculo
 

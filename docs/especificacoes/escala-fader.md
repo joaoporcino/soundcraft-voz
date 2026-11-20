@@ -1,10 +1,10 @@
-# Escala de fader de entrada
-
 ## Situação atual
 
 - Estado: Implementado para fader de entrada no mix principal.
 - Integração: Serviço e terminal; não abrange AUX, master ou ganho.
 - Validação: Testes unitários, fluxo e HTTP/CLI com estado simulado passaram; Ui24R física pendente. Simulação não comprova a curva ou aplicação física.
+
+# Escala de fader de entrada
 
 ## Objetivo e contrato
 

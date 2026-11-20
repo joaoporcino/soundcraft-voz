@@ -28,8 +28,15 @@ export function parseTeamsCommand([category, action, ...values]) {
     'sessao-grupo': ['addSessionTeam', 'removeSessionTeam'], 'sessao-integrante': ['addSessionMember', 'removeSessionMember'],
     'sessao-papel': ['addSessionRole', 'removeSessionRole'],
   };
-  if (!fields || !['adicionar', 'remover'].includes(action) || values.length !== fields.length) throw new Error('Comando de equipe inválido; consulte ajuda.');
+  const reviewedAction = action?.endsWith('-revisado');
+  const baseAction = reviewedAction ? action.slice(0, -'-revisado'.length) : action;
+  if (!fields || !['adicionar', 'remover'].includes(baseAction) || values.length !== fields.length + (reviewedAction ? 1 : 0)) {
+    throw new Error('Comando de equipe inválido; consulte ajuda.');
+  }
   const record = Object.fromEntries(fields.map((field, index) => [field, id(values[index])]));
-  const method = methods[category][action === 'adicionar' ? 0 : 1];
-  return registry => registry[method](record);
+  const method = methods[category][baseAction === 'adicionar' ? 0 : 1];
+  if (!reviewedAction) return registry => registry[method](record);
+  const expectedRevision = values.at(-1);
+  if (!/^[a-f0-9]{64}$/u.test(expectedRevision ?? '')) throw new Error('Revisão de equipe inválida.');
+  return registry => registry[`${method}Reviewed`]({ ...record, expectedRevision });
 }

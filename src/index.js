@@ -12,10 +12,13 @@ const has = flag => args.includes(flag);
 const value = flag => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
 const python = value('--python') || (process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python');
 if (has('--help')) {
-  console.log('npm start -- [--servico start|status|stop | --cadastro COMANDO | --exportar-backup ARQUIVO | --restaurar-backup ARQUIVO --destino DIRETORIO | --configurar-ip IP_DA_MESA | --mostrar-ip | --live [--ip IP_DA_MESA]] [--texto] [--descrever] [--fim-por-silencio] [--dispositivo ID] [--canal-audio N] [--listar-dispositivos] [--modelo small]');
+  console.log('npm start -- [--menu | --servico start|status|stop | --cadastro COMANDO | --exportar-backup ARQUIVO | --restaurar-backup ARQUIVO --destino DIRETORIO | --configurar-ip IP_DA_MESA | --mostrar-ip | --live [--ip IP_DA_MESA]] [--texto] [--descrever] [--fim-por-silencio] [--dispositivo ID] [--canal-audio N] [--listar-dispositivos] [--modelo small]');
   process.exit(0);
 }
-if (has('--servico')) {
+if (has('--menu')) {
+  const { runTerminalUi } = await import('./terminal-ui.js');
+  await runTerminalUi();
+} else if (has('--servico')) {
   try {
     const { runLocalServiceCli } = await import('./local-service-cli.js');
     process.exitCode = await runLocalServiceCli(args.slice(args.indexOf('--servico') + 1));

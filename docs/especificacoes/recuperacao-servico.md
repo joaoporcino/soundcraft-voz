@@ -1,10 +1,10 @@
-# Recuperação de conexão e captura
-
 ## Situação atual
 
 - Estado: Recuperação implementada com validação simulada.
 - Integração: Serviço local, observações de mesa e workers de áudio.
 - Validação: Testes HTTP, workers e áudio simulados; mesa, USB e microfone físicos pendentes.
+
+# Recuperação de conexão e captura
 
 ## Objetivo e contrato
 

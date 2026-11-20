@@ -1,10 +1,10 @@
-# Seleção de provedor de linguagem
-
 ## Situação atual
 
 - Estado: Seletor e adaptadores de três provedores implementados.
 - Integração: Serviço e terminal integram seleção persistente conforme [especificação](llm-servico.md); painel permanece pendente.
 - Validação: Adaptadores, transporte e HTTP simulados; chamadas reais pendentes.
+
+# Seleção de provedor de linguagem
 
 ## Objetivo e estado
 

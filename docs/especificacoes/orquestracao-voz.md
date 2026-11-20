@@ -1,10 +1,10 @@
-# Orquestração de pedidos de voz sem execução
-
 ## Situação atual
 
 - Estado: Orquestrador de texto implementado.
-- Integração: Serviço usa entradas identificadas, parser local e Gemini opcional com consentimento explícito.
+- Integração: Serviço usa entradas identificadas, parser local e provedores opcionais Gemini, OpenAI e Anthropic com consentimento explícito, conforme [integração](llm-servico.md).
 - Validação: Testes determinísticos; voz, provedor e mesa reais pendentes.
+
+# Orquestração de pedidos de voz sem execução
 
 ## Estado e vínculo
 

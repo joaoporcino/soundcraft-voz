@@ -29,19 +29,52 @@ export function parsePhysicalRegistryCommand([category, action, ...values], { ex
     count(values, 0, 'fisico-ponto listar');
     return r => r.listSignalPoints();
   }
-  if (category === 'fisico-ponto' && action === 'adicionar') {
+  if (category === 'fisico-ponto' && ['adicionar', 'adicionar-revisado'].includes(action)) {
     if (values.length < 2 || (values.length - 2) % 2 !== 0) throw new Error('Uso: fisico-ponto adicionar TIPO ETIQUETA [OPÇÕES]');
     const point = { type: values[0], label: values[1] };
     const options = { '--direcao': 'direction', '--dispositivo': 'deviceId', '--equipamento': 'equipmentId', '--pessoa': 'personId', '--retorno': 'monitorReturnId', '--canal': 'channel' };
+    const revisions = { '--revisao-dispositivo': 'device', '--revisao-equipamento': 'equipment', '--revisao-pessoa': 'person', '--revisao-sessao': 'session', '--revisao-retorno': 'monitorReturn' };
+    const expectedRevisions = {};
     for (let i = 2; i < values.length; i += 2) {
       const key = Object.hasOwn(options, values[i]) ? options[values[i]] : null;
+      if (action === 'adicionar-revisado' && values[i] === '--sessao-revisada') {
+        if (expectedRevisions.sessionId !== undefined) throw new Error('Sessão revisada repetida.');
+        expectedRevisions.sessionId = id(values[i + 1], 'Sessão revisada');
+        continue;
+      }
+      const revisionKey = action === 'adicionar-revisado' && Object.hasOwn(revisions, values[i]) ? revisions[values[i]] : null;
+      if (revisionKey) {
+        if (expectedRevisions[revisionKey] !== undefined || !/^[a-f0-9]{64}$/.test(values[i + 1])) throw new Error(`Revisão inválida ou repetida: ${values[i]}.`);
+        expectedRevisions[revisionKey] = values[i + 1];
+        continue;
+      }
       if (!key || Object.hasOwn(point, key)) throw new Error(`Opção de ponto inválida ou repetida: ${values[i]}.`);
       if (key === 'direction') {
         if (!['input', 'output', 'bidirectional', 'unknown'].includes(values[i + 1])) throw new Error('Direção inválida.');
         point[key] = values[i + 1];
       } else point[key] = id(values[i + 1], values[i]);
     }
-    return r => r.addSignalPoint(point);
+    if (action === 'adicionar') return r => r.addSignalPoint(point);
+    const requiredRevision = { port: 'device', snake_way: 'device', equipment: 'equipment', person: 'person', monitor_return: 'monitorReturn' }[point.type];
+    if (!requiredRevision || !expectedRevisions[requiredRevision]) throw new Error('A variante revisada exige referência revisada compatível com o tipo de ponto.');
+    if (point.type === 'monitor_return' && (!expectedRevisions.session || !expectedRevisions.sessionId)) throw new Error('Ponto de retorno exige sessão e retorno revisados.');
+    if (point.type !== 'monitor_return' && (expectedRevisions.session || expectedRevisions.sessionId || expectedRevisions.monitorReturn)) throw new Error('Revisões inesperadas para o tipo de ponto.');
+    if (Object.keys(expectedRevisions).some(key => key !== requiredRevision && key !== 'session' && key !== 'sessionId' && key !== 'monitorReturn')) throw new Error('Revisão incompatível com o tipo de ponto.');
+    return r => r.addSignalPointRevised(point, { expectedRevisions });
+  }
+  if (category === 'fisico-ligacao' && action === 'propor-revisado') {
+    count(values, 9, 'fisico-ligacao propor-revisado SESSAO ORIGEM DESTINO|desconhecido TIPO REV_SESSAO REV_ORIGEM REV_DESTINO|desconhecido REV_RETORNO_ORIGEM|desconhecido REV_RETORNO_DESTINO|desconhecido');
+    const input = { sessionId: id(values[0], 'Sessão'), fromPointId: id(values[1], 'Origem'),
+      toPointId: optionalId(values[2], 'Destino'), kind: values[3] };
+    const expectedRevisions = { session: values[4], fromPoint: values[5], toPoint: values[6], fromReturn: values[7], toReturn: values[8] };
+    for (const [key, value] of Object.entries(expectedRevisions)) {
+      const nullable = key === 'toPoint' && input.toPointId === null || key === 'fromReturn' && values[7] === 'desconhecido' || key === 'toReturn' && values[8] === 'desconhecido';
+      if (nullable) continue;
+      if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) throw new Error(`Revisão inválida: ${key}.`);
+    }
+    if (input.toPointId === null && values[6] !== 'desconhecido') throw new Error('Destino desconhecido exige revisão desconhecida.');
+    if (!['physical', 'internal', 'patch'].includes(input.kind)) throw new TypeError('Tipo de ligação inválido');
+    return r => r.proposeSignalLinkRevised(input, { expectedRevisions });
   }
   if (category === 'fisico-ligacao' && action === 'propor') {
     count(values, 4, 'fisico-ligacao propor SESSAO ORIGEM DESTINO|desconhecido TIPO');

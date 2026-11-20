@@ -1,10 +1,10 @@
-# Processo de voz persistente
-
 ## Situação atual
 
 - Estado: Worker persistente implementado.
 - Integração: Terminal e serviço podem reutilizar o processo de transcrição.
 - Validação: Áudio e modelo simulados; desempenho e transcrição reais pendentes.
+
+# Processo de voz persistente
 
 ## Estado e vínculo
 

@@ -1,10 +1,10 @@
-# Configuração local de voz do serviço
-
 ## Situação atual
 
 - Estado: Configuração persistente de voz implementada.
 - Integração: CLI e serviço; alterações exigem reinício do serviço.
 - Validação: Testes simulados; microfone e modelo reais pendentes.
+
+# Configuração local de voz do serviço
 
 ## Objetivo e vínculo
 

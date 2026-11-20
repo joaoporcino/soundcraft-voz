@@ -20,24 +20,32 @@ const HELP = `Cadastro local — comandos:
   sessao-grupo adicionar|remover SESSAO GRUPO
   sessao-integrante adicionar|remover SESSAO GRUPO PESSOA
   sessao-papel adicionar|remover SESSAO GRUPO PESSOA PAPEL
+  Para relações de equipe, adicionar-revisado|remover-revisado recebe os mesmos IDs e REVISAO ao final.
   formacao mostrar SESSAO
   vinculo propor SESSAO_ID PESSOA_ID EQUIPAMENTO_ID [CANAL]
+  vinculo propor-revisado SESSAO_ID PESSOA_ID EQUIPAMENTO_ID CANAL|desconhecido REV_SESSAO REV_PESSOA REV_EQUIPAMENTO
   vinculo confirmar ID
   vinculo listar SESSAO_ID
   entrada-fonte vincular SESSAO_ID ENTRADA VINCULO_ID
   entrada-fonte listar SESSAO_ID | remover SESSAO_ID ENTRADA
+  entrada-fonte remover-revisado SESSAO_ID ENTRADA IDENTIDADE
   aux-config mostrar
   aux-config definir QUANTIDADE
   retorno adicionar SESSAO_ID AUX
+  retorno adicionar-revisado SESSAO_ID AUX REV_SESSAO REV_CONFIG
   retorno listar SESSAO_ID
   retorno-vinculo propor SESSAO_ID PESSOA_ID RETORNO_ID
+  retorno-vinculo propor-revisado SESSAO_ID PESSOA_ID RETORNO_ID REV_SESSAO REV_PESSOA REV_RETORNO
   retorno-vinculo listar SESSAO_ID
   retorno-vinculo confirmar ID
   retorno-vinculo rejeitar ID
   retorno-vinculo revogar ID
   fisico-dispositivo adicionar NOME TIPO | listar
   fisico-ponto adicionar TIPO ETIQUETA [--direcao input|output|bidirectional|unknown] [--dispositivo ID] [--equipamento ID] [--pessoa ID] [--retorno ID] [--canal N] | listar
+  fisico-ponto adicionar-revisado TIPO ETIQUETA [OPÇÕES] --revisao-dispositivo|--revisao-equipamento|--revisao-pessoa REVISAO
+    Para retorno: --sessao-revisada SESSAO --revisao-sessao REVISAO --revisao-retorno REVISAO
   fisico-ligacao propor SESSAO ORIGEM DESTINO|desconhecido TIPO
+  fisico-ligacao propor-revisado SESSAO ORIGEM DESTINO|desconhecido TIPO REV_SESSAO REV_ORIGEM REV_DESTINO|desconhecido REV_RETORNO_ORIGEM|desconhecido REV_RETORNO_DESTINO|desconhecido
   fisico-ligacao listar SESSAO | confirmar ID ORIGEM | rejeitar ID | revogar ID
   fisico-caminho consultar SESSAO PONTO
   voz-vinculo propor SESSAO ORIGEM "FRASE" | listar SESSAO
@@ -45,6 +53,8 @@ const HELP = `Cadastro local — comandos:
   voz-vinculo confirmar ID | rejeitar ID
   passagem mostrar SESSAO | confirmar SESSAO TIPO ID REVISAO [ORIGEM]
   passagem rejeitar SESSAO TIPO ID | corrigir SESSAO vinculo|voz ID PESSOA EQUIPAMENTO CANAL
+  passagem rejeitar-revisado|revogar-revisado SESSAO TIPO ID REVISAO
+  passagem corrigir-revisado SESSAO vinculo|voz ID REVISAO PESSOA EQUIPAMENTO CANAL
   passagem corrigir SESSAO pessoa ID REVISAO NOME
   passagem corrigir SESSAO equipamento ID REVISAO NOME TIPO COR|desconhecido sim|nao|desconhecido CAPSULA|desconhecido MODELO|desconhecido
   passagem substituir SESSAO vinculo ID REVISAO_SUBSTITUICAO PESSOA EQUIPAMENTO CANAL|desconhecido
@@ -141,6 +151,7 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
     if (action === 'vincular') requireCount(values, 3, 3, 'entrada-fonte vincular SESSAO_ID ENTRADA VINCULO_ID');
     else if (action === 'listar') requireCount(values, 1, 1, 'entrada-fonte listar SESSAO_ID');
     else if (action === 'remover') requireCount(values, 2, 2, 'entrada-fonte remover SESSAO_ID ENTRADA');
+    else if (action === 'remover-revisado') requireCount(values, 3, 3, 'entrada-fonte remover-revisado SESSAO_ID ENTRADA IDENTIDADE');
     else fail('Comando entrada-fonte desconhecido.');
     const sessionId = parseId(values[0], 'ID da sessão');
     const assignmentId = action === 'vincular' ? parseId(values[2], 'ID do vínculo') : undefined;
@@ -148,7 +159,7 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
     const registry = openRegistry(path.join(directory, 'cadastros.sqlite'));
     try {
       const result = action === 'vincular' ? registry.bindInputSource({ sessionId, inputId: values[1], assignmentId })
-        : action === 'remover' ? registry.unbindInputSource({ sessionId, inputId: values[1] })
+        : ['remover', 'remover-revisado'].includes(action) ? registry.unbindInputSource({ sessionId, inputId: values[1], ...(action === 'remover-revisado' ? { expectedBindingId: values[2] } : {}) })
           : registry.listInputSources(sessionId);
       printRecord(output, result);
     } finally { registry.close(); }
@@ -163,13 +174,16 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
   else if (category === 'sessao' && action === 'criar') requireCount(values, 1, 1, 'sessao criar NOME');
   else if (category === 'sessao' && action === 'listar') requireCount(values, 0, 0, 'sessao listar');
   else if (category === 'vinculo' && action === 'propor') requireCount(values, 3, 4, 'vinculo propor SESSAO_ID PESSOA_ID EQUIPAMENTO_ID [CANAL]');
+  else if (category === 'vinculo' && action === 'propor-revisado') requireCount(values, 7, 7, 'vinculo propor-revisado SESSAO_ID PESSOA_ID EQUIPAMENTO_ID CANAL|desconhecido REV_SESSAO REV_PESSOA REV_EQUIPAMENTO');
   else if (category === 'vinculo' && action === 'confirmar') requireCount(values, 1, 1, 'vinculo confirmar ID');
   else if (category === 'vinculo' && action === 'listar') requireCount(values, 1, 1, 'vinculo listar SESSAO_ID');
   else if (category === 'aux-config' && action === 'mostrar') requireCount(values, 0, 0, 'aux-config mostrar');
   else if (category === 'aux-config' && action === 'definir') requireCount(values, 1, 1, 'aux-config definir QUANTIDADE');
   else if (category === 'retorno' && action === 'adicionar') requireCount(values, 2, 2, 'retorno adicionar SESSAO_ID AUX');
+  else if (category === 'retorno' && action === 'adicionar-revisado') requireCount(values, 4, 4, 'retorno adicionar-revisado SESSAO_ID AUX REV_SESSAO REV_CONFIG');
   else if (category === 'retorno' && action === 'listar') requireCount(values, 1, 1, 'retorno listar SESSAO_ID');
   else if (category === 'retorno-vinculo' && action === 'propor') requireCount(values, 3, 3, 'retorno-vinculo propor SESSAO_ID PESSOA_ID RETORNO_ID');
+  else if (category === 'retorno-vinculo' && action === 'propor-revisado') requireCount(values, 6, 6, 'retorno-vinculo propor-revisado SESSAO_ID PESSOA_ID RETORNO_ID REV_SESSAO REV_PESSOA REV_RETORNO');
   else if (category === 'retorno-vinculo' && ['listar', 'confirmar', 'rejeitar', 'revogar'].includes(action)) requireCount(values, 1, 1, `retorno-vinculo ${action} ID`);
   else fail(`Comando desconhecido: ${usage}. Use "ajuda" para ver os comandos.`);
 
@@ -182,22 +196,25 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
   let monitorSessionId;
   let auxCount;
   if (category === 'aux-config' && action === 'definir') auxCount = parseId(values[0], 'Quantidade de AUX');
-  if (category === 'retorno' && action === 'adicionar') {
+  if (category === 'retorno' && ['adicionar', 'adicionar-revisado'].includes(action)) {
     monitorInput = { sessionId: parseId(values[0], 'ID da sessão'), aux: parseId(values[1], 'AUX') };
-  } else if (category === 'retorno-vinculo' && action === 'propor') {
+    if (action === 'adicionar-revisado') monitorInput.expectedRevisions = { session: values[2], config: values[3] };
+  } else if (category === 'retorno-vinculo' && ['propor', 'propor-revisado'].includes(action)) {
     monitorInput = { sessionId: parseId(values[0], 'ID da sessão'), personId: parseId(values[1], 'ID da pessoa'), returnId: parseId(values[2], 'ID do retorno') };
+    if (action === 'propor-revisado') monitorInput.expectedRevisions = { session: values[3], person: values[4], monitorReturn: values[5] };
   } else if ((category === 'retorno' || category === 'retorno-vinculo') && action === 'listar') {
     monitorSessionId = parseId(values[0], 'ID da sessão');
   } else if (category === 'retorno-vinculo') {
     monitorId = parseId(values[0], 'ID do vínculo de retorno');
   }
   if (category === 'equipamento' && action === 'adicionar') equipmentInput = parseEquipmentArguments(values);
-  if (category === 'vinculo' && action === 'propor') {
+  if (category === 'vinculo' && ['propor', 'propor-revisado'].includes(action)) {
     assignmentInput = {
       sessionId: parseId(values[0], 'ID da sessão'),
       personId: parseId(values[1], 'ID da pessoa'),
       equipmentId: parseId(values[2], 'ID do equipamento'),
-      ...(values[3] === undefined ? {} : { channel: parseChannel(values[3]) }),
+      ...(values[3] === undefined || values[3] === 'desconhecido' && action === 'propor-revisado' ? {} : { channel: parseChannel(values[3]) }),
+      ...(action === 'propor-revisado' ? { expectedReferences: { sessao: values[4], pessoa: values[5], equipamento: values[6] } } : {}),
     };
   } else if (category === 'vinculo' && action === 'confirmar') {
     assignmentId = parseId(values[0], 'ID do vínculo');
@@ -225,7 +242,7 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
       message = 'Sessão criada:';
     } else if (category === 'sessao' && action === 'listar') {
       result = await registry.listSessions();
-    } else if (category === 'vinculo' && action === 'propor') {
+    } else if (category === 'vinculo' && ['propor', 'propor-revisado'].includes(action)) {
       result = await registry.proposeAssignment(assignmentInput);
       message = 'Vínculo proposto:';
     } else if (category === 'vinculo' && action === 'confirmar') {
@@ -236,13 +253,17 @@ export async function runRegistryCommand(args, { directory = getConfigDirectory(
     } else if (category === 'aux-config' && action === 'definir') {
       result = registry.setAuxConfig(auxCount);
       message = 'Quantidade de AUX configurada:';
-    } else if (category === 'retorno' && action === 'adicionar') {
-      result = registry.addMonitorReturn(monitorInput);
+    } else if (category === 'retorno' && ['adicionar', 'adicionar-revisado'].includes(action)) {
+      result = action === 'adicionar-revisado'
+        ? registry.addMonitorReturnReviewed({ ...monitorInput, expectedSessionRevision: monitorInput.expectedRevisions.session, expectedConfigRevision: monitorInput.expectedRevisions.config })
+        : registry.addMonitorReturn(monitorInput);
       message = 'Retorno cadastrado:';
     } else if (category === 'retorno' && action === 'listar') {
       result = registry.listMonitorReturns(monitorSessionId);
-    } else if (category === 'retorno-vinculo' && action === 'propor') {
-      result = registry.proposeMonitorAssignment(monitorInput);
+    } else if (category === 'retorno-vinculo' && ['propor', 'propor-revisado'].includes(action)) {
+      result = action === 'propor-revisado'
+        ? registry.proposeMonitorAssignmentReviewed({ ...monitorInput, expectedSessionRevision: monitorInput.expectedRevisions.session, expectedPersonRevision: monitorInput.expectedRevisions.person, expectedReturnRevision: monitorInput.expectedRevisions.monitorReturn })
+        : registry.proposeMonitorAssignment(monitorInput);
       message = 'Vínculo de retorno proposto:';
     } else if (category === 'retorno-vinculo' && action === 'confirmar') {
       result = registry.confirmMonitorAssignment(monitorId);

@@ -17,8 +17,26 @@ const lists = {
 };
 
 export function parseSoundcheckCommand(args) {
-  const [category, action, sessionText, type, idText, ...rest] = args;
-  if (category !== 'passagem' || !['mostrar', 'confirmar', 'rejeitar', 'corrigir', 'substituir'].includes(action)) throw new Error('Comando de passagem desconhecido');
+  const [category, rawAction, sessionText, type, idText, ...rawRest] = args;
+  const replacementReviewed = rawAction === 'substituir-referencias-revisadas';
+  const referenceReviewed = rawAction === 'corrigir-referencias-revisadas';
+  const revised = referenceReviewed || ['corrigir-revisado', 'rejeitar-revisado', 'revogar-revisado'].includes(rawAction);
+  const action = replacementReviewed ? 'substituir' : referenceReviewed ? 'corrigir' : revised ? rawAction.replace('-revisado', '') : rawAction;
+  if (category !== 'passagem' || !['mostrar', 'confirmar', 'rejeitar', 'corrigir', 'substituir', 'revogar'].includes(action) || (action === 'revogar' && !revised)) throw new Error('Comando de passagem desconhecido');
+  const expectedReview = revised ? rawRest[0] : undefined;
+  if (revised && !/^[a-f0-9]{64}$/.test(expectedReview ?? '')) throw new Error('Revisão obrigatória');
+  const rest = revised ? rawRest.slice(1) : rawRest;
+  let expectedReferences;
+  if (referenceReviewed) {
+    if (rest.length !== 5) throw new Error('Revisões das referências obrigatórias');
+    const tokens = rest.splice(3, 2);
+    expectedReferences = Object.fromEntries(['pessoa', 'equipamento'].map((key, index) => {
+      const value = tokens[index];
+      const unknown = rest[index] === 'desconhecido';
+      if (unknown ? value !== 'desconhecido' : !/^[a-f0-9]{64}$/.test(value ?? '')) throw new Error('Revisões das referências inválidas');
+      return [key, unknown ? null : value];
+    }));
+  }
   const sessionId = positive(sessionText, 'Sessão');
   if (action === 'mostrar') {
     if (type !== undefined) throw new Error('Uso: passagem mostrar SESSAO');
@@ -65,7 +83,8 @@ export function parseSoundcheckCommand(args) {
         orientacao: [
           'Confira pessoas, equipamentos, canal e retorno; dados desconhecidos não devem ser presumidos.',
           'Após revisar, use passagem confirmar SESSAO TIPO ID REVISAO; ligação também requer ORIGEM.',
-          'Para corrigir vínculo ou voz use passagem corrigir SESSAO TIPO ID PESSOA EQUIPAMENTO CANAL; use desconhecido onde permitido.',
+          'Para corrigir vínculo ou voz use passagem corrigir-revisado SESSAO TIPO ID REVISAO PESSOA EQUIPAMENTO CANAL; use desconhecido onde permitido.',
+          'Para rejeitar proposta ou revogar retorno ou ligação confirmados use passagem rejeitar-revisado ou revogar-revisado SESSAO TIPO ID REVISAO.',
           'Corrigir pessoa ou equipamento altera o cadastro global e pode afetar outras sessões. Use a revisão exibida.',
           'Para substituir vínculo confirmado, confira entradasAssociadas e use revisaoSubstituicao; cria proposta e desvincula essas entradas.',
           'Para corrigir retorno ou ligação, rejeite a proposta e cadastre outra. Para vínculo simples, corrija a proposta.',
@@ -75,7 +94,7 @@ export function parseSoundcheckCommand(args) {
     };
   }
   const id = positive(idText, 'ID');
-  if (action === 'corrigir' && ['pessoa', 'equipamento'].includes(type)) {
+  if (action === 'corrigir' && ['pessoa', 'equipamento'].includes(type) && !revised) {
     if (!/^[a-f0-9]{64}$/.test(rest[0] ?? '') || rest.length !== (type === 'pessoa' ? 2 : 7)) throw new Error('Uso: passagem corrigir SESSAO pessoa ID REVISAO NOME | equipamento ID REVISAO NOME TIPO COR|desconhecido sim|nao|desconhecido CAPSULA|desconhecido MODELO|desconhecido');
     if (type === 'equipamento' && !['sim', 'nao', 'desconhecido'].includes(rest[4])) throw new Error('Sem fio deve ser sim, nao ou desconhecido');
     return r => {
@@ -87,16 +106,22 @@ export function parseSoundcheckCommand(args) {
     };
   }
   if (action === 'substituir') {
-    if (type !== 'vinculo' || rest.length !== 4 || !/^[a-f0-9]{64}$/.test(rest[0] ?? '')) throw new Error('Uso: passagem substituir SESSAO vinculo ID REVISAO PESSOA EQUIPAMENTO CANAL|desconhecido');
+    if (type !== 'vinculo' || rest.length !== (replacementReviewed ? 6 : 4) || !/^[a-f0-9]{64}$/.test(rest[0] ?? '')) throw new Error('Uso: passagem substituir SESSAO vinculo ID REVISAO PESSOA EQUIPAMENTO CANAL|desconhecido');
     const input = { sessionId, expectedRevision: rest[0], personId: positive(rest[1], 'Pessoa'), equipmentId: positive(rest[2], 'Equipamento'), channel: optional(rest[3], 'Canal') };
     if (input.channel !== null && input.channel > 24) throw new Error('Canal deve estar entre 1 e 24');
-    return r => r.replaceConfirmedAssignment(id, input);
+    if (replacementReviewed) {
+      if (!rest.slice(4).every(value => /^[a-f0-9]{64}$/.test(value))) throw new Error('Revisões das referências inválidas');
+      input.expectedReferences = { pessoa: rest[4], equipamento: rest[5] };
+    }
+    return r => replacementReviewed ? r.replaceConfirmedAssignmentReviewed(id, input) : r.replaceConfirmedAssignment(id, input);
   }
   if (!Object.hasOwn(lists, type)) throw new Error('Tipo deve ser vinculo, retorno, ligacao ou voz');
   if (action === 'confirmar') {
     if (rest.length !== (type === 'ligacao' ? 2 : 1) || !/^[a-f0-9]{64}$/.test(rest[0] ?? '') || (type === 'ligacao' && !rest[1]?.trim())) throw new Error('Uso: passagem confirmar SESSAO TIPO ID REVISAO [ORIGEM para ligação]');
   } else if (action === 'rejeitar') {
     if (rest.length || type === 'vinculo') throw new Error('Rejeição disponível para retorno, ligacao e voz; corrija o vínculo simples');
+  } else if (action === 'revogar') {
+    if (rest.length || !['retorno', 'ligacao'].includes(type)) throw new Error('Revogação revisada disponível para retorno ou ligação');
   } else if (rest.length !== 3 || !['vinculo', 'voz'].includes(type)) {
     throw new Error('Uso: passagem corrigir SESSAO vinculo|voz ID PESSOA EQUIPAMENTO CANAL');
   }
@@ -109,8 +134,10 @@ export function parseSoundcheckCommand(args) {
   return (r) => {
     if (!r.listSessions().some(item => item.id === sessionId)) throw new Error('Sessão não encontrada');
     const item = r[lists[type]](sessionId).find(value => value.id === id);
-    if (!item || item.status !== 'proposto') throw new Error('Registro pendente não encontrado nesta sessão');
-    if (action === 'corrigir') return type === 'voz' ? r.editVoiceProposal(id, { ...changes, authorized: true }) : r.editAssignment(id, changes);
+    if (!item || item.status !== (action === 'revogar' ? 'confirmado' : 'proposto')) {
+      throw new Error(action === 'revogar' ? 'Registro confirmado não encontrado nesta sessão' : 'Registro pendente não encontrado nesta sessão');
+    }
+    if (action === 'corrigir') return type === 'voz' ? r.editVoiceProposal(id, { ...changes, authorized: true, expectedRevision: expectedReview, ...(referenceReviewed ? { expectedReferences, sessionId } : {}) }) : r.editAssignment(id, { ...changes, expectedRevision: expectedReview, ...(referenceReviewed ? { expectedReferences, sessionId } : {}) });
     if (action === 'confirmar') {
       const expectedRevision = rest[0];
       if (type === 'vinculo') return r.confirmAssignment(id, { expectedRevision });
@@ -118,8 +145,9 @@ export function parseSoundcheckCommand(args) {
       if (type === 'ligacao') return r.confirmSignalLink(id, { origin: rest[1], expectedRevision });
       return r.confirmVoiceProposal(id, { authorized: true, expectedRevision });
     }
-    if (type === 'retorno') return r.rejectMonitorAssignment(id);
-    if (type === 'ligacao') return r.rejectSignalLink(id);
-    return r.rejectVoiceProposal(id, { authorized: true });
+    if (action === 'revogar') return type === 'retorno' ? r.revokeMonitorAssignment(id, { expectedRevision: expectedReview }) : r.revokeSignalLink(id, { expectedRevision: expectedReview });
+    if (type === 'retorno') return r.rejectMonitorAssignment(id, { expectedRevision: expectedReview });
+    if (type === 'ligacao') return r.rejectSignalLink(id, { expectedRevision: expectedReview });
+    return r.rejectVoiceProposal(id, { authorized: true, expectedRevision: expectedReview });
   };
 }

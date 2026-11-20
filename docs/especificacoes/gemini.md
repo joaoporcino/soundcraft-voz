@@ -1,10 +1,10 @@
-# Provedor Gemini opcional
-
 ## Situação atual
 
 - Estado: Adaptador opcional implementado.
 - Integração: Serviço e terminal conforme [integração opcional](llm-servico.md); aceita transporte injetado e consentimento.
 - Validação: Transporte simulado; chamada ao provedor real não validada.
+
+# Provedor Gemini opcional
 
 ## Estado e vínculo
 

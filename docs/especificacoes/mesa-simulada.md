@@ -1,10 +1,10 @@
-# Mesa simulada em memória e por WebSocket
-
 ## Situação atual
 
 - Estado: Simuladores em memória e WebSocket implementados.
 - Integração: Usados em testes e terminal; não produzem áudio.
 - Validação: Testes locais; fidelidade ao firmware físico não comprovada.
+
+# Mesa simulada em memória e por WebSocket
 
 ## Estado e vínculo
 

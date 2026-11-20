@@ -12,6 +12,10 @@ Fase 3 do [plano](../plano-de-execucao.md): associar entradas identificadas a fo
 
 ## Contrato e decisões
 
+O CMD associa entrada identificada a fonte confirmada da sessão selecionada, com lista contextual e confirmação. A tela reconsulta sessão e fonte antes de chamar a operação transacional existente; não infere identidade ou ligação física. O comando recusa entrada já vinculada e não substitui associação silenciosamente. Testes com banco temporário cobrem escopo, cancelamento, duplicidade e vínculo confirmado.
+
+A remoção revisada usa `bindingId` retornado pela lista e faz exclusão condicional atômica por sessão, entrada e identidade. Se a associação tiver sido removida ou substituída, recusa sem remover a nova. O comando legado permanece; não há mudança de esquema ou backup. O CMD mostra entrada e fonte e exige confirmação. Testes com banco temporário cobrem cancelamento, substituição concorrente e remoção normal, além do comando antigo.
+
 - Persistir vínculo explícito de entrada a um vínculo de fonte confirmado da sessão, com referência íntegra, identidade opaca de entrada, unicidade por sessão/entrada e exclusão explícita; não selecionar pessoa nem canal por inferência. Migrar banco e preservar/restaurar backups de esquemas anteriores.
 - Terminal define sessão ativa explicitamente no serviço. Quando ativa, cada origem precisa ter vínculo cadastrado nessa sessão; contexto expõe somente identificadores da sessão, entrada e vínculo, sem atribuir identidade da pessoa que fala. Antes de interpretar, após interpretação assíncrona e antes de confirmar, consultar novamente o banco e recusar vínculo removido ou modificado. Troca de sessão invalida pedidos. Sem sessão ativa permanece disponível o fluxo legado identificado por entrada. A gravação por outro processo após a última leitura pode concorrer com o envio; este limite não prova atomicidade com processos externos.
 - Cada entrada tem contexto, ativação, geração e proposta independentes; novo texto ou cancelamento invalida apenas seu contexto. Queda, troca de modo ou revogação invalida as propostas afetadas; respostas tardias não reabrem conversas.

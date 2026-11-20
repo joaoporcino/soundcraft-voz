@@ -1,10 +1,10 @@
-# Configuração persistente e limite de uso de LLM
-
 ## Situação atual
 
 - Estado: Implementado e testado em simulação.
 - Integração: Serviço local, terminal, provedores e backup.
 - Validação: Testes Node e HTTP com provedores e transportes simulados; serviços reais pendentes.
+
+# Configuração persistente e limite de uso de LLM
 
 ## Objetivo e decisões
 

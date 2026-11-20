@@ -1,10 +1,10 @@
-# Configuração e reconexão da mesa
-
 ## Situação atual
 
 - Estado: Configuração e reconexão implementadas.
 - Integração: Terminal e serviço; mudança de IP no serviço exige reinício.
 - Validação: Conexão e reconexão simuladas; sincronização e mesa real pendentes.
+
+# Configuração e reconexão da mesa
 
 ## Estado e vínculo
 

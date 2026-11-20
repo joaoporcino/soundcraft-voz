@@ -1,10 +1,10 @@
-# Operação de comandos pelo serviço local
-
 ## Situação atual
 
 - Estado: Comandos limitados e confirmação implementados.
 - Integração: Serviço local com terminal, entradas identificadas e captura manual.
 - Validação: Testes com mesa e áudio simulados; aplicação física não comprovada.
+
+# Operação de comandos pelo serviço local
 
 ## Objetivo e escopo
 

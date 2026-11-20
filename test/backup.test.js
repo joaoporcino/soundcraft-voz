@@ -44,6 +44,28 @@ test('creates a portable backup and restores config plus SQLite records', async 
   assert.equal(await fs.readFile(path.join(target, 'unrelated.txt'), 'utf8').catch(() => null), null);
 });
 
+test('restaura em caminho Windows longo usando banco auxiliar de LLM', { skip: process.platform !== 'win32' }, async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'sc-long-'));
+  t.after(async () => {
+    const target = await fs.realpath(root), base = await fs.realpath(os.tmpdir());
+    const relative = path.relative(base, target);
+    assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+    await fs.rm(target, { recursive: true, force: true });
+  });
+  const source = path.join(root, 'src'), backupPath = path.join(root, 'backup.json');
+  await fs.mkdir(source);
+  await fs.writeFile(path.join(source, 'config.json'), '{"ip":"192.0.2.1"}\n');
+  await createBackup({ directory: source, destination: backupPath });
+  const padding = Math.max(1, 190 - root.length - 1);
+  const parent = path.join(root, 'x'.repeat(padding));
+  await fs.mkdir(parent);
+  const target = path.join(parent, 'restaurado');
+  await restoreBackup({ directory: target, source: backupPath });
+  assert.equal(JSON.parse(await fs.readFile(path.join(target, 'config.json'), 'utf8')).ip, '192.0.2.1');
+  const state = createLlmState({ directory: target });
+  try { assert.equal(state.read().restore_lock, 1); } finally { state.close(); }
+});
+
 test('serializes a committed SQLite WAL snapshot while the registry connection remains open', async (t) => {
   const source = await temporaryDirectory(t);
   const target = path.join(await temporaryDirectory(t), 'restored');

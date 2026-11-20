@@ -1,10 +1,10 @@
-# Validação determinística de propostas de ferramentas
-
 ## Situação atual
 
 - Estado: Validador determinístico implementado.
 - Integração: Serviço revalida propostas limitadas locais ou da LLM antes do envio.
 - Validação: Testes automatizados e serviço simulado; aplicação física não comprovada.
+
+# Validação determinística de propostas de ferramentas
 
 ## Estado e vínculo
 

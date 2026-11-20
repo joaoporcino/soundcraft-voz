@@ -1,16 +1,28 @@
-# Caminhos físicos, patch e propostas por voz
-
 ## Situação atual
 
 - Estado: Cadastro de caminhos e propostas por fala restrita implementados.
 - Integração: Terminal, SQLite e captura manual do serviço; sem LLM neste fluxo.
 - Validação: Testes com dados temporários e worker simulado; patch e ligações reais não verificados.
 
+# Caminhos físicos, patch e propostas por voz
+
+**Rodada em 20/11/2026:** o CMD usa variantes revisadas para criar pontos com referências e propor ligações, conferindo na transação sessão e referências selecionadas. Pontos de canal, mix e outro não selecionam referência externa e mantêm o comando existente. Comandos anteriores, destino desconhecido, proposta pendente e confirmação separada foram preservados; sem alteração de esquema ou backup. Testes direcionados passaram 63/63; suíte compartilhada 400/400 com simulação. Os quatro primeiros parágrafos do modelo abaixo descrevem historicamente as telas antes desta rodada.
+
 ## Estado e objetivo
 
 Implementado para cadastro e simulação na fase 4 do [plano](../plano-de-execucao.md). Registra e consulta caminhos de entrada e de retorno sem alterar a mesa, e permite que uma transcrição capturada ou fornecida pelo operador proponha vínculo de microfone a pessoa com revisão humana. Captura manual integrada é descrita em [captura para cadastro](captura-cadastro.md); não há LLM integrada a este fluxo.
 
 ## Modelo e regras
+
+O CMD cria pontos de canal, porta e via de medusa pela lista de pontos. Solicita etiqueta, direção e canal ou dispositivo existente conforme tipo; para via, filtra medusas. A criação exige revisão e confirmação, reconsulta o dispositivo e chama operação específica. O contrato não recebe revisão transacional de dispositivo; testes com banco temporário cobrem lista vazia, filtro de medusa, cancelamento, direção e persistência sem acesso físico.
+
+O formulário também cria pontos de equipamento, pessoa, mix e outro, selecionando referências por nome e ID quando aplicável. Opções avançadas seguem no CLI. A referência é reconsultada antes da criação, sem revisão transacional; testes com banco temporário cobrem seleção e persistência.
+
+O ponto de retorno é criado pela seleção de sessão e retorno pertencente a ela, com confirmação e reconsulta. O escopo e as validações existentes são preservados, sem assumir roteamento ou capacidade física. O contrato não recebe revisão transacional das referências; testes com banco temporário cobrem lista vazia, escopo e persistência.
+
+O CMD propõe ligação física, interna ou patch pela tela da sessão, selecionando pontos por identificação e contexto, com opção explícita de destino desconhecido. Pontos de retorno são restritos à sessão; a tela reconsulta referências e cria somente proposta após confirmação, e o domínio valida escopo e regras de confirmação posteriores. A reconsulta não é transacional. Testes com banco temporário cobrem escopo, cancelamento, destino desconhecido e ausência de confirmação automática.
+
+No detalhe da ligação, o CMD permite confirmação revisada com origem informada, rejeição de proposta e revogação de ligação confirmada, usando operações específicas. As ações usam revisão da passagem verificada transacionalmente, sem cobrir dados relacionados. Testes com banco temporário cobrem destino desconhecido, conflito, revisão antiga e histórico sem operar a mesa.
 
 - SQLite versionado, migração transacional e compatibilidade de backup; mesa, medusa e outros dispositivos são configuráveis, sem quantidades fixas. Pontos representam portas, vias, equipamento, canais, AUX, pessoas e demais extremidades; números de entrada, via e canal são distintos.
 - Ligações direcionadas por sessão têm origem, destino quando conhecido e estado proposto, confirmado, rejeitado ou revogado; confirmar requer extremidades válidas, ausência de conflito e origem/data. Corrigir é revogar explicitamente a ligação confirmada e propor outra, preservando histórico. Um ponto de destino físico não pode receber ligações confirmadas conflitantes; ramificações e mistura devem ser representadas explicitamente. Destinos desconhecidos permanecem propostos.

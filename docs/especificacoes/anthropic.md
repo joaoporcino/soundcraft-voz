@@ -1,7 +1,7 @@
 ## Situação atual
 
-- Estado: Adaptador implementado e testado isoladamente.
-- Integração: Adaptador isolado para o contrato de provedor; integração ao serviço será tratada separadamente.
+- Estado: Adaptador implementado; integração ao serviço concluída em simulação.
+- Integração: Serviço e terminal locais conforme [integração de LLM](llm-servico.md); o teste individual histórico abaixo usa adaptador isolado.
 - Validação: Quatro testes com transporte falso e seletor; sem chamadas externas ou credenciais reais.
 
 # Adaptador Anthropic

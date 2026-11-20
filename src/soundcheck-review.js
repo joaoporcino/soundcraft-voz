@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 const FIELDS = Object.freeze({
+  sessao: ['id', 'name'],
   pessoa: ['id', 'name'],
   equipamento: ['id', 'name', 'kind', 'color', 'wireless', 'capsule', 'model'],
   vinculo: ['id', 'sessionId', 'personId', 'equipmentId', 'channel', 'status'],

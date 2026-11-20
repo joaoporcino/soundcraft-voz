@@ -1,10 +1,10 @@
-# Ativação textual por “mesa”
-
 ## Situação atual
 
 - Estado: Implementada para texto.
 - Integração: Usada pelo orquestrador no serviço para entradas identificadas.
 - Validação: Testes determinísticos; detecção acústica e áudio real não validados.
+
+# Ativação textual por “mesa”
 
 ## Estado e vínculo
 

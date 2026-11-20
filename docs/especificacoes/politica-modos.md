@@ -1,10 +1,10 @@
-# Política segura de modos e microfone master
-
 ## Situação atual
 
 - Estado: Modos, configuração de entradas e master implementados.
 - Integração: Serviço e terminal; configurações persistentes e início pausado, com captura manual por entrada identificada.
 - Validação: Política, persistência, revogação, backup e HTTP testados sem equipamento; validação física pendente.
+
+# Política segura de modos e microfone master
 
 ## Estado e vínculo
 

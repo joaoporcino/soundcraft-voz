@@ -1,10 +1,10 @@
-# Adaptador OpenAI opcional
-
 ## Situação atual
 
 - Estado: Adaptador implementado para o contrato de provedores.
-- Integração: Isolado; integração ao serviço é atividade separada.
+- Integração: Serviço e terminal locais conforme [integração de LLM](llm-servico.md); o teste individual histórico abaixo usa adaptador isolado.
 - Validação: Cinco testes e ESLint passaram com transporte falso; provedor real não testado.
+
+# Adaptador OpenAI opcional
 
 ## Objetivo e contrato
 

@@ -33,6 +33,9 @@ export async function checkDocumentation(root) {
     const content = await readFile(file, 'utf8');
     const body = withoutCode(content);
     if (display.startsWith('docs/especificacoes/') && display !== 'docs/especificacoes/modelo.md') {
+      if (!/^\s*## Situação atual[\t ]*(?:\r?\n|$)/.test(body)) {
+        errors.push(`${display}: ## Situação atual deve ser a primeira seção`);
+      }
       const section = /^## Situação atual\s*\r?\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(body)?.[1] ?? '';
       for (const field of ['Estado', 'Integração', 'Validação']) {
         if (!new RegExp(`^- ${field}:[^\\S\\r\\n]*\\S`, 'm').test(section)) errors.push(`${display}: campo ${field} ausente ou vazio em Situação atual`);

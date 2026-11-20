@@ -4,7 +4,7 @@ Visão consolidada do que está registrado no código e na [arquitetura](arquite
 
 ## Entidades persistidas no SQLite
 
-As onze tabelas abaixo compõem o cadastro no esquema v4. `assignments` registra pessoa, equipamento, sessão e canal declarado; `monitor_assignments` associa pessoa a retorno em uma sessão. Dispositivos, pontos e ligações físicas registram caminhos informados, enquanto `voice_proposals` guarda propostas a partir de transcrições simuladas. A configuração global `monitor_config` não possui chave estrangeira para as tabelas de sessão. Os rótulos nas relações são nomes de domínio, não nomes extras de tabelas.
+O diagrama abaixo é um recorte histórico do esquema v4 e não inclui as tabelas das migrações v5 a v7, como associações de entrada, histórico e equipes; o esquema atual é v7 em `src/registry.js`. `assignments` registra pessoa, equipamento, sessão e canal declarado; `monitor_assignments` associa pessoa a retorno em uma sessão. Dispositivos, pontos e ligações físicas registram caminhos informados, enquanto `voice_proposals` guarda propostas a partir de transcrições simuladas. A configuração global `monitor_config` não possui chave estrangeira para as tabelas de sessão. Os rótulos nas relações são nomes de domínio, não nomes extras de tabelas.
 
 ```mermaid
 erDiagram
@@ -109,6 +109,82 @@ erDiagram
 ```
 
 Um AUX pode ser compartilhado, mas há no máximo um vínculo de retorno confirmado por pessoa e sessão na implementação atual. A contagem de confirmados não comprova exclusividade ou disponibilidade física. O canal de entrada é um número declarado, não uma chave estrangeira para o patch real. Os estados de vínculo de equipamento são `proposto` e `confirmado`; os de retorno incluem também `rejeitado` e `revogado`.
+
+### Complemento do esquema v7
+
+O diagrama anterior preserva o recorte v4; este complemento representa as tabelas acrescentadas nas versões 5–7, conferidas nas migrações de `src/registry.js`. Em conjunto, os dois cobrem as tabelas do esquema v7. Chaves compostas e restrições detalhadas permanecem no código; as linhas representam chaves estrangeiras, não autorização nem relação física observada.
+
+```mermaid
+erDiagram
+    sessions ||--o{ input_sources : contem
+    assignments ||--o{ input_sources : associado
+    assignments ||--o| retired_assignments : original
+    assignments ||--o| retired_assignments : substituto
+    teams ||--o{ team_members : possui
+    people ||--o{ team_members : integra
+    team_members ||--o{ team_member_roles : possui
+    roles ||--o{ team_member_roles : define
+    sessions ||--o{ session_teams : inclui
+    teams ||--o{ session_teams : participa
+    session_teams ||--o{ session_members : inclui
+    team_members ||--o{ session_members : participa
+    session_members ||--o{ session_roles : possui
+    roles ||--o{ session_roles : define
+    input_sources {
+        integer session_id PK,FK
+        text input_id PK
+        integer assignment_id FK
+        text binding_id UK
+    }
+    registry_corrections {
+        integer id PK
+        text entity_type
+        integer entity_id
+        text before_json
+        text after_json
+        text changed_at
+    }
+    retired_assignments {
+        integer assignment_id PK,FK
+        integer replacement_id FK
+        text inputs_json
+        text changed_at
+    }
+    teams {
+        integer id PK
+        text name
+    }
+    roles {
+        integer id PK
+        text name
+    }
+    team_members {
+        integer team_id PK,FK
+        integer person_id PK,FK
+    }
+    team_member_roles {
+        integer team_id PK,FK
+        integer person_id PK,FK
+        integer role_id PK,FK
+    }
+    session_teams {
+        integer session_id PK,FK
+        integer team_id PK,FK
+    }
+    session_members {
+        integer session_id PK,FK
+        integer team_id PK,FK
+        integer person_id PK,FK
+    }
+    session_roles {
+        integer session_id PK,FK
+        integer team_id PK,FK
+        integer person_id PK,FK
+        integer role_id PK,FK
+    }
+```
+
+`registry_corrections` identifica a entidade por tipo e ID, sem chave estrangeira polimórfica. `retired_assignments` guarda as entradas desvinculadas em JSON e aponta para os vínculos anterior e substituto; `input_sources` usa chave composta por sessão e entrada. Papéis de sessão referenciam a formação da sessão, enquanto papéis do grupo referenciam sua composição; não são a mesma relação.
 
 `monitor_config` armazena a quantidade configurável de AUX: um banco legado preserva o valor histórico de oito como não confirmado; um banco novo aguarda configuração explícita. A quantidade informada não detecta a capacidade da mesa. A escolha é feita no terminal; ainda não há instalador que colete essa configuração automaticamente.
 
@@ -237,7 +313,7 @@ flowchart LR
 
 O fluxo do serviço exige confirmação antes de pedir mute/fader à biblioteca e indica que a entrega não está confirmada. O protótipo anterior em terminal possui um caminho `--live` direto, distinto do serviço. A transcrição com modelo e microfone reais, a Ui24R física e a tarefa de login real não foram validadas nesta rodada. Iniciar/instalar a tarefa são ações distintas; os testes do Agendador foram simulados.
 
-Há módulos testados isoladamente para política de modos, palavra de ativação textual, provedor Gemini opcional, validação de propostas, destino de resposta e fila de reprodução simulada. Sua existência não comprova a integração de todas essas peças ao produto; em particular a fila não toca áudio nem opera AUX. No serviço atual, a seleção de modos é pausa/passagem; o modo culto descrito no domínio ainda precisa ser integrado.
+O serviço integra seleção de pausa, passagem e culto, interpretação opcional por provedores e fila de respostas simulada. Sua existência não comprova execução física ou permissões completas; em particular a fila não toca áudio nem opera AUX. Os detalhes e limites dos testes estão no plano e nas especificações de cada fluxo.
 
 ## Casos de uso planejados
 
